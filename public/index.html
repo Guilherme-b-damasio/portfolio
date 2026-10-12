@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Guilherme Damasio</title>
+  <meta name="description" content="Backend, infra e IA. Este site é um dos projetos: API, RAG e métricas ao vivo." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="wrap hero">
+    <p class="eyebrow" id="role">Backend · Infra · IA</p>
+    <h1 id="name">Guilherme Damasio</h1>
+    <p class="lede">Este site é um dos projetos: uma API em Node/TypeScript rodando no meu k3s, com um RAG que responde sobre mim e métricas reais logo abaixo.</p>
+    <nav class="links" id="links"></nav>
+  </header>
+
+  <main class="wrap">
+    <section aria-labelledby="term-title">
+      <div class="section-head">
+        <h2 id="term-title">Terminal</h2>
+        <p>Digite <code>help</code> ou clique numa sugestão.</p>
+      </div>
+      <div class="terminal" id="terminal">
+        <div class="term-bar"><span></span><span></span><span></span><b>guest@portfolio: ~</b></div>
+        <div class="term-out" id="term-out" aria-live="polite"></div>
+        <form class="term-in" id="term-form" autocomplete="off">
+          <label for="term-input" class="prompt">$</label>
+          <input id="term-input" spellcheck="false" placeholder='ask "que projetos de IA você tem?"' />
+        </form>
+      </div>
+      <div class="chips" id="chips">
+        <button data-cmd="whoami">whoami</button>
+        <button data-cmd="ls projects">ls projects</button>
+        <button data-cmd='ask "como funciona o docsage?"'>ask "como funciona o docsage?"</button>
+        <button data-cmd="status">status</button>
+        <button data-cmd="curl /api/projects">curl /api/projects</button>
+      </div>
+    </section>
+
+    <section aria-labelledby="proj-title">
+      <div class="section-head"><h2 id="proj-title">Projetos</h2></div>
+      <div class="grid" id="projects"></div>
+    </section>
+
+    <section aria-labelledby="status-title">
+      <div class="section-head">
+        <h2 id="status-title">Ao vivo</h2>
+        <p>Atualiza a cada 5s a partir de <code>/api/status</code>. Prometheus em <code>/metrics</code>.</p>
+      </div>
+      <div class="stats" id="stats"></div>
+      <table class="routes" id="routes">
+        <thead><tr><th>rota</th><th>reqs</th><th>p50</th><th>p95</th><th>erros</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <span id="build">build dev</span>
+  </footer>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
