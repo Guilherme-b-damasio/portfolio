@@ -64,7 +64,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 ## 0.4 Playgrounds
 
 - [ ] Laboratório de rate limit: balde de tokens do visitante a partir dos headers reais, com botão "dispara 10"
-- [ ] Servidor MCP público em `/mcp` (Streamable HTTP, só leitura: `profile`, `projects`, `search`) + instrução
+- [x] Servidor MCP público em `/mcp` (Streamable HTTP, só leitura: `profile`, `projects`, `search`) + instrução
       `claude mcp add` na página
 - [ ] Playground de busca: sliders de `k1`, `b` e top-k, com o ranking se reordenando ao vivo
 - [ ] Laboratório de carga controlada: ≤ 200 requisições, uma corrida por vez no total, fila visível e latência via SSE
@@ -79,6 +79,8 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 - [x] Alternância de tema claro/escuro
 - [ ] Versão em inglês (conteúdo bilíngue, `?lang=en`)
 - [ ] Imagem de compartilhamento (OG), meta tags e `robots.txt`
+- [x] Páginas `/sobre`, `/projetos`, `/mcp` e `/contato` (design v2), com skills que apontam para provas reais
+- [ ] **[dono]** Ligar o formulário de contato: secret com `RESEND_API_KEY` e `CONTACT_TO` no cluster
 - [ ] Acessibilidade: terminal usável só com teclado e leitor de tela; Lighthouse ≥ 95
 
 ## Qualidade (contínuo)

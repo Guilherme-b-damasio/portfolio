@@ -2,7 +2,12 @@ import { api } from "./js/api.js";
 import { createDiagram } from "./js/diagram.js";
 import { el, icon } from "./js/dom.js";
 import { createLivePanel } from "./js/live.js";
+import { createContatoPage } from "./js/pages/contato.js";
+import { createMcpPage } from "./js/pages/mcp.js";
+import { createProjetosPage } from "./js/pages/projetos.js";
+import { createSobrePage } from "./js/pages/sobre.js";
 import { createRequestsPanel } from "./js/requests-panel.js";
+import { createRouter } from "./js/router.js";
 import { createTerminal } from "./js/terminal.js";
 
 const $ = (id) => document.getElementById(id);
@@ -41,15 +46,31 @@ const terminal = createTerminal({
   chips: $("chips"),
   bucket: { root: $("bucket"), cells: $("bucket-cells"), count: $("bucket-count") },
   projects: { get: () => slugs, set: (s) => (slugs = s) },
+  navigate: (page) => router.go(page),
 });
 
+/** Runs a command in the home terminal, switching to the home page first when needed. */
 function openInTerminal(command) {
+  if (router.page !== "inicio") router.go("inicio", null, "terminal");
+  else {
+    const top = $("terminal").getBoundingClientRect().top + window.scrollY - 16;
+    window.scrollTo({ top, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  }
   terminal.run(command);
-  const top = $("terminal").getBoundingClientRect().top + window.scrollY - 16;
-  window.scrollTo({ top, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+}
+
+/** What an evidence or detail button does. Kept in one place so every page means the same thing by "proj". */
+function act(action) {
+  if (action.type === "run") openInTerminal(action.target);
+  else if (action.type === "proj") router.go("projetos", action.target);
+  else if (action.type === "page") router.go(action.target);
+  else if (action.type === "live") router.go("inicio", null, "ao-vivo");
+  else if (action.type === "exp") router.go("sobre", null, "experiencia");
+  else if (action.type === "link") window.open(action.target, "_blank", "noopener");
 }
 
 // ---------- hero and projects ----------
+// The hero shows these three; phone and the rest live on /contato.
 const LINK_LABELS = { github: "GitHub", linkedin: "LinkedIn", email: "E-mail" };
 
 async function renderProfile() {
@@ -58,7 +79,7 @@ async function renderProfile() {
   $("role").textContent = body.role;
   document.title = `${body.name} · ${body.role}`;
   const links = Object.entries(body.links ?? {})
-    .filter(([, href]) => !href.includes("TODO"))
+    .filter(([key, href]) => LINK_LABELS[key] && !href.includes("TODO"))
     .map(([key, href]) =>
       el(
         "a",
@@ -152,6 +173,19 @@ createLivePanel({
   lastRead: $("last-read"),
   footer: { build: $("build"), rest: $("build-rest") },
   onStatus: (status) => diagram.setLlm(status.llm),
+});
+
+// ---------- pages ----------
+const go = (page, param) => router.go(page, param);
+const router = createRouter({
+  nav: $("pages-nav"),
+  pages: {
+    inicio: { root: $("page-inicio") },
+    sobre: createSobrePage({ root: $("page-sobre"), act }),
+    projetos: createProjetosPage({ root: $("page-projetos"), act, go }),
+    mcp: createMcpPage({ root: $("page-mcp") }),
+    contato: createContatoPage({ root: $("page-contato") }),
+  },
 });
 
 renderProfile().catch(() => {});

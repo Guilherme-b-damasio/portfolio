@@ -65,6 +65,8 @@ export function edgesFor({ route, status, generated }) {
   if (/^GET \/api\/(status|ask\/quota)/.test(route) || route === "GET /metrics" || route === "GET /healthz") {
     return ["vi", "ia", "ax"];
   }
+  if (route === "POST /api/contact") return status === 202 ? ["vi", "ia", "ar"] : ["vi", "ia"];
+  if (route === "POST /mcp") return ["vi", "ia", "am"];
   if (route.startsWith("GET /api/")) return ["vi", "ia", "am"];
   return ["vi", "ia"];
 }
@@ -130,4 +132,72 @@ export function commandForSource(source) {
   const slug = file.replace(/\.md$/, "");
   if (slug === "profile") return "whoami";
   return section ? `cat ${slug} "${section}"` : `cat ${slug}`;
+}
+
+export const PAGES = ["inicio", "sobre", "projetos", "mcp", "contato"];
+
+/** "#/projetos/docsage" → { page: "projetos", param: "docsage" }. Plain anchors like "#terminal" stay on the home page. */
+export function parseRoute(hash) {
+  const match = /^#\/([\w-]+)(?:\/([\w-]+))?/.exec(hash ?? "");
+  if (!match || !PAGES.includes(match[1])) {
+    const anchor = hash && hash.startsWith("#") && !hash.startsWith("#/") ? hash.slice(1) : null;
+    return { page: "inicio", param: null, anchor };
+  }
+  return { page: match[1], param: match[2] ?? null, anchor: null };
+}
+
+/** Inline **bold** → [{ text, bold }]. */
+export function inlineParts(text) {
+  return text
+    .split(/(\*\*[^*]+\*\*)/)
+    .filter(Boolean)
+    .map((t) =>
+      t.startsWith("**") && t.endsWith("**") ? { text: t.slice(2, -2), bold: true } : { text: t, bold: false },
+    );
+}
+
+/**
+ * The little Markdown the content uses, as blocks: "### " headings, "- " bullets, TODO notes and paragraphs
+ * (consecutive lines join). Rendered with text nodes only, never as HTML.
+ */
+export function markdownBlocks(text) {
+  const blocks = [];
+  let paragraph = [];
+  const flush = () => {
+    if (paragraph.length) blocks.push({ type: "p", parts: inlineParts(paragraph.join(" ")) });
+    paragraph = [];
+  };
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) flush();
+    else if (line.startsWith("### ")) {
+      flush();
+      blocks.push({ type: "h3", text: line.slice(4) });
+    } else if (line.startsWith("- ")) {
+      flush();
+      blocks.push({ type: "li", parts: inlineParts(line.slice(2)) });
+    } else if (/^TODO\b/.test(line)) {
+      flush();
+      blocks.push({ type: "todo", text: line });
+    } else paragraph.push(line);
+  }
+  flush();
+  return blocks;
+}
+
+/** Same rules as POST /api/contact, so the visitor sees mistakes before spending a send. */
+export function validateContact({ name, email, message }) {
+  const errors = {};
+  if (!name.trim()) errors.name = "Diga seu nome.";
+  else if ([...name].some((c) => c.charCodeAt(0) < 32)) errors.name = "Use só uma linha.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) errors.email = "Esse e-mail não parece válido.";
+  if (message.trim().length < 20) errors.message = "Escreva pelo menos 20 caracteres.";
+  else if (message.trim().length > 1000) errors.message = "No máximo 1000 caracteres.";
+  return errors;
+}
+
+/** What to paste in each MCP client to connect to this site. */
+export function installSnippet(client, url) {
+  if (client === "code") return `claude mcp add --transport http portfolio ${url}`;
+  return JSON.stringify({ mcpServers: { portfolio: { command: "npx", args: ["mcp-remote", url] } } }, null, 2);
 }

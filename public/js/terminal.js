@@ -7,11 +7,13 @@ import {
   formatUptime,
   guessCommand,
   highlightParts,
+  PAGES,
   parseLine,
   sections,
 } from "./lib.js";
 
-const COMMANDS = ["help", "whoami", "ls", "cat", "ask", "status", "curl", "clear"];
+const COMMANDS = ["help", "whoami", "ls", "cat", "ask", "status", "curl", "open", "clear"];
+const OPENABLE = PAGES.filter((p) => p !== "inicio");
 const CHIPS = ["whoami", "ls projects", 'ask "como funciona o docsage?"', "status", "curl /api/projects", "help"];
 const isTodo = (text) => /^TODO\b/.test(text.trim());
 
@@ -22,7 +24,7 @@ const acc = (t) => text(t, "t-acc");
 const warn = (t) => text(t, "t-warn");
 const bold = (t) => text(t, "t-bold");
 
-export function createTerminal({ out, form, input, hint, chips, bucket, projects }) {
+export function createTerminal({ out, form, input, hint, chips, bucket, projects, navigate }) {
   const history = [];
   let historyIndex = 0;
   let quota = null; // { remaining, limit, refillPerMinute, at }
@@ -89,6 +91,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ['ask "<pergunta>"', "pergunta ao RAG sobre mim"],
         ["status", "métricas ao vivo deste servidor"],
         ["curl <caminho>", "chama a API crua, ex: curl /api/profile"],
+        ["open <página>", OPENABLE.join(" · ")],
         ["clear", "limpa a tela"],
       ];
       print(...rows.map(([c, d]) => line([acc(c.padEnd(20)), dim(d)])));
@@ -264,6 +267,13 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
       say(typeof body === "string" ? body.slice(0, 2000) : JSON.stringify(body, null, 2).slice(0, 4000));
     },
 
+    open(args) {
+      const page = (args[0] ?? "").replace(/^\//, "");
+      if (!PAGES.includes(page)) return say(warn("! "), `uso: open ${OPENABLE.join(" | ")}`);
+      say(dim(`abrindo /${page}…`));
+      setTimeout(() => navigate(page), 250);
+    },
+
     clear() {
       out.replaceChildren();
     },
@@ -322,7 +332,15 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
     } else if (e.key === "Tab" && input.value.trim()) {
       const words = input.value.split(" ");
       const pool =
-        words.length === 1 ? COMMANDS : words[0] === "cat" ? projects.get() : words[0] === "ls" ? ["projects"] : [];
+        words.length === 1
+          ? COMMANDS
+          : words[0] === "cat"
+            ? projects.get()
+            : words[0] === "ls"
+              ? ["projects"]
+              : words[0] === "open"
+                ? OPENABLE
+                : [];
       const matches = pool.filter((c) => c.startsWith(words[words.length - 1]));
       if (!matches.length) return;
       if (matches.length === 1) {
