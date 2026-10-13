@@ -5,6 +5,7 @@ import { BrowsePortfolio } from "./application/browse-portfolio.js";
 import { ReportStatus } from "./application/report-status.js";
 import { createApp } from "./http/app.js";
 import { MarkdownContentSource } from "./infrastructure/content/markdown-content-source.js";
+import { JsonLogger } from "./infrastructure/logging/json-logger.js";
 import { ClaudeAnswerer } from "./infrastructure/llm/claude-answerer.js";
 import { InMemoryMetrics } from "./infrastructure/metrics/in-memory-metrics.js";
 import { Bm25Retriever } from "./infrastructure/search/bm25-retriever.js";
@@ -19,25 +20,19 @@ const retriever = new Bm25Retriever(chunkContent(content));
 // Without a key the chat still works: it returns the retrieved passages instead of a generated answer.
 const answerer = process.env.ANTHROPIC_API_KEY ? new ClaudeAnswerer() : null;
 const metrics = new InMemoryMetrics();
+const logger = new JsonLogger();
 
 const app = createApp({
   browse: new BrowsePortfolio(content),
   askQuestion: new AskQuestion(retriever, answerer),
   reportStatus: new ReportStatus(metrics, answerer?.model ?? null),
   metrics,
+  logger,
   publicDir: path.join(root, "public"),
 });
 
 const server = app.listen(port, () => {
-  console.log(
-    JSON.stringify({
-      level: "info",
-      msg: "listening",
-      port,
-      projects: content.projects.length,
-      llm: answerer?.model ?? "off",
-    }),
-  );
+  logger.info("listening", { port, projects: content.projects.length, llm: answerer?.model ?? "off" });
 });
 
 // k8s sends SIGTERM on rollout; finish in-flight requests before exiting.
