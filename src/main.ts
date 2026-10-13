@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import https from "node:https";
+import type { Server } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AskQuestion } from "./application/ask-question.js";
@@ -14,6 +17,7 @@ import { DailyTokenBudget } from "./infrastructure/llm/daily-token-budget.js";
 import { ResendMailer } from "./infrastructure/mail/resend-mailer.js";
 import { InMemoryMetrics } from "./infrastructure/metrics/in-memory-metrics.js";
 import { DnsReverseLookup } from "./infrastructure/net/dns-reverse-lookup.js";
+import { TlsTap } from "./infrastructure/tls/tls-tap.js";
 import { SampledHistory } from "./infrastructure/metrics/sampled-history.js";
 import { Bm25Retriever } from "./infrastructure/search/bm25-retriever.js";
 import { chunkContent } from "./infrastructure/search/chunker.js";
@@ -37,6 +41,11 @@ const metrics = new InMemoryMetrics();
 const history = new SampledHistory(metrics);
 const stopSampling = history.start();
 const logger = new JsonLogger();
+// With a certificate the app also terminates TLS itself, so the scan can read each visitor's ClientHello.
+// In the cluster this needs a TCP passthrough route; behind a TLS-terminating proxy there is nothing to read.
+const certFile = process.env.TLS_CERT_FILE;
+const keyFile = process.env.TLS_KEY_FILE;
+const tap = certFile && keyFile ? new TlsTap() : null;
 
 const app = createApp({
   browse: new BrowsePortfolio(content),
@@ -44,6 +53,7 @@ const app = createApp({
   reportStatus: new ReportStatus(metrics, answerer?.model ?? null, history, budget),
   sendContact: new SendContact(mailer),
   inspectVisitor: new InspectVisitor(scanChecks(), new DnsReverseLookup()),
+  tlsFingerprints: tap,
   metrics,
   logger,
   publicDir: path.join(root, "public"),
@@ -59,10 +69,20 @@ const server = app.listen(port, () => {
   });
 });
 
+let tlsServer: Server | null = null;
+if (tap && certFile && keyFile) {
+  const tlsPort = Number(process.env.TLS_PORT ?? 8443);
+  const httpsServer = https.createServer({ cert: readFileSync(certFile), key: readFileSync(keyFile) }, app);
+  tlsServer = tap.server(httpsServer).listen(tlsPort, () => {
+    logger.info("listening", { port: tlsPort, tls: "fingerprinted" });
+  });
+}
+
 // k8s sends SIGTERM on rollout; finish in-flight requests before exiting.
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.on(signal, () => {
     stopSampling();
+    tlsServer?.close();
     server.close(() => process.exit(0));
   });
 }
