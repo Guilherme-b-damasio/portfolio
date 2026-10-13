@@ -18,144 +18,374 @@
     <div class="page">
       <header class="topbar">
         <a href="#topo" class="brand">guilherme<span>@portfolio</span></a>
-        <nav aria-label="Seções" class="wide">
-          <a href="#terminal">Terminal</a>
-          <a href="#projetos">Projetos</a>
-          <a href="#ao-vivo">Ao vivo</a>
-          <a href="#arquitetura">Arquitetura</a>
+        <nav aria-label="Páginas" class="pages-nav" id="pages-nav">
+          <a href="#/inicio" data-page="inicio"><span>00</span>início</a>
+          <a href="#/sobre" data-page="sobre"><span>01</span>sobre</a>
+          <a href="#/projetos" data-page="projetos"><span>02</span>projetos</a>
+          <a href="#/mcp" data-page="mcp"><span>03</span>mcp</a>
+          <a href="#/contato" data-page="contato"><span>04</span>contato</a>
         </nav>
         <button type="button" id="theme" class="icon-btn" aria-label="Mudar o tema"></button>
       </header>
 
       <main>
-        <section id="topo" class="hero" aria-labelledby="hero-name">
-          <div class="hero-text">
-            <p class="eyebrow" id="role">Backend · Infra · IA</p>
-            <h1 id="hero-name">Guilherme Damasio</h1>
+        <div id="page-inicio">
+          <section id="topo" class="hero" aria-labelledby="hero-name">
+            <div class="hero-text">
+              <p class="eyebrow" id="role">Backend · Infra · IA</p>
+              <h1 id="hero-name">Guilherme Damasio</h1>
+              <p class="lede">
+                Este site é um dos projetos: uma API em Node/TypeScript rodando no meu k3s, com um RAG que responde
+                sobre mim e métricas reais logo abaixo.
+              </p>
+              <div class="hero-links" id="hero-links">
+                <a href="#terminal" class="btn btn-primary"
+                  >Abrir o terminal<svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 5v14M19 12l-7 7-7-7"></path></svg
+                ></a>
+              </div>
+            </div>
+            <aside class="server grid-frame" aria-label="Este servidor agora">
+              <div class="server-head">
+                <span class="dot" aria-hidden="true"></span><span>Este servidor, agora</span>
+              </div>
+              <div id="facts" class="facts"></div>
+              <a href="#ao-vivo" class="server-foot">ver métricas ↓</a>
+            </aside>
+          </section>
+
+          <section id="terminal" class="block" aria-labelledby="t-term">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>01</span>
+                <h2 id="t-term">Terminal</h2>
+              </div>
+              <p>Fala com a API de verdade. Digite <code>help</code> ou toque numa sugestão.</p>
+            </div>
+            <div class="term" role="region" aria-label="Terminal interativo">
+              <div class="term-bar">
+                <span>guest@portfolio: ~</span>
+                <span id="bucket" class="bucket" role="img" hidden>
+                  <span>ask</span>
+                  <span id="bucket-cells" class="bucket-cells"></span>
+                  <span id="bucket-count"></span>
+                </span>
+              </div>
+              <div class="term-out" id="term-out" aria-live="polite" aria-label="Saída do terminal" tabindex="0"></div>
+              <form class="term-in" id="term-form" autocomplete="off">
+                <label for="term-input">$</label>
+                <input
+                  id="term-input"
+                  spellcheck="false"
+                  autocapitalize="off"
+                  aria-label="Comando do terminal"
+                  placeholder='ask "que projetos de IA você tem?"'
+                />
+                <span id="term-hint" aria-hidden="true"></span>
+              </form>
+            </div>
+            <div class="chips" id="chips" role="group" aria-label="Sugestões de comando"></div>
+          </section>
+
+          <section id="projetos" class="block" aria-labelledby="t-proj">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>02</span>
+                <h2 id="t-proj">Projetos</h2>
+              </div>
+              <p>Cada um abre no terminal com o texto completo, ou <a href="#/projetos">veja todos com filtro →</a></p>
+            </div>
+            <div class="grid grid-frame projects" id="projects"></div>
+          </section>
+
+          <section id="ao-vivo" class="block" aria-labelledby="t-live">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>03</span>
+                <h2 id="t-live">Ao vivo</h2>
+              </div>
+              <p>
+                Atualiza a cada 5s a partir de <code>/api/status</code>. Última leitura
+                <span class="mono strong" id="last-read">—</span>.
+              </p>
+            </div>
+            <div class="grid grid-frame stats" id="stats"></div>
+            <h3 class="table-title">rotas</h3>
+            <div class="table-wrap">
+              <table class="data" id="routes">
+                <thead>
+                  <tr>
+                    <th scope="col">rota</th>
+                    <th scope="col">reqs</th>
+                    <th scope="col">p50</th>
+                    <th scope="col">p95</th>
+                    <th scope="col" class="wide">erros</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </section>
+
+          <section id="arquitetura" class="block" aria-labelledby="t-arch">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>04</span>
+                <h2 id="t-arch">Arquitetura</h2>
+              </div>
+              <p>Cada requisição sua acende o caminho que percorreu. Rode um comando no terminal e veja.</p>
+            </div>
+            <div class="grid grid-frame arch">
+              <div class="cell">
+                <svg id="diagram-wide" class="diagram wide" role="img" aria-label="Diagrama da arquitetura"></svg>
+                <svg id="diagram-narrow" class="diagram narrow" role="img" aria-label="Diagrama da arquitetura"></svg>
+              </div>
+              <div class="cell log">
+                <span class="muted small">suas últimas requisições</span>
+                <ol id="request-log" aria-live="off"></ol>
+              </div>
+            </div>
+          </section>
+        </div>
+        <div id="page-sobre" hidden>
+          <section class="page-hero" aria-labelledby="pg-sobre">
+            <p class="eyebrow">/sobre</p>
+            <h1 id="pg-sobre">Sobre</h1>
             <p class="lede">
-              Este site é um dos projetos: uma API em Node/TypeScript rodando no meu k3s, com um RAG que responde sobre
-              mim e métricas reais logo abaixo.
+              Backend, infra e IA. Aqui estão o texto, as skills e onde cada uma aparece de verdade: no trabalho, nos
+              projetos e neste servidor.
             </p>
-            <div class="hero-links" id="hero-links">
-              <a href="#terminal" class="btn btn-primary"
-                >Abrir o terminal<svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M12 5v14M19 12l-7 7-7-7"></path></svg
-              ></a>
-            </div>
+          </section>
+          <div class="two-cols">
+            <div class="bio" id="sobre-bio"></div>
+            <dl class="grid-frame fact-list" id="sobre-facts"></dl>
           </div>
-          <aside class="server grid-frame" aria-label="Este servidor agora">
-            <div class="server-head"><span class="dot" aria-hidden="true"></span><span>Este servidor, agora</span></div>
-            <div id="facts" class="facts"></div>
-            <a href="#ao-vivo" class="server-foot">ver métricas ↓</a>
-          </aside>
-        </section>
 
-        <section id="terminal" class="block" aria-labelledby="t-term">
-          <div class="rule" aria-hidden="true"></div>
-          <div class="block-head">
-            <div class="block-title">
-              <span>01</span>
-              <h2 id="t-term">Terminal</h2>
+          <section class="block" aria-labelledby="t-skills">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>01</span>
+                <h2 id="t-skills">Skills</h2>
+              </div>
+              <p>Toque numa skill para ver onde ela aparece. Sem barra de porcentagem: só prova.</p>
             </div>
-            <p>Fala com a API de verdade. Digite <code>help</code> ou toque numa sugestão.</p>
-          </div>
-          <div class="term" role="region" aria-label="Terminal interativo">
-            <div class="term-bar">
-              <span>guest@portfolio: ~</span>
-              <span id="bucket" class="bucket" role="img" hidden>
-                <span>ask</span>
-                <span id="bucket-cells" class="bucket-cells"></span>
-                <span id="bucket-count"></span>
-              </span>
+            <div class="grid grid-frame skill-groups" id="sobre-skills"></div>
+            <div class="evidence-box" aria-live="polite">
+              <div class="evidence-head">
+                <h3 id="skill-title"></h3>
+                <button type="button" class="btn btn-line btn-mono" id="skill-ask"></button>
+              </div>
+              <ul class="evidence-list" id="skill-evidence"></ul>
             </div>
-            <div class="term-out" id="term-out" aria-live="polite" aria-label="Saída do terminal" tabindex="0"></div>
-            <form class="term-in" id="term-form" autocomplete="off">
-              <label for="term-input">$</label>
-              <input
-                id="term-input"
-                spellcheck="false"
-                autocapitalize="off"
-                aria-label="Comando do terminal"
-                placeholder='ask "que projetos de IA você tem?"'
-              />
-              <span id="term-hint" aria-hidden="true"></span>
-            </form>
-          </div>
-          <div class="chips" id="chips" role="group" aria-label="Sugestões de comando"></div>
-        </section>
+          </section>
 
-        <section id="projetos" class="block" aria-labelledby="t-proj">
-          <div class="rule" aria-hidden="true"></div>
-          <div class="block-head">
-            <div class="block-title">
-              <span>02</span>
-              <h2 id="t-proj">Projetos</h2>
+          <section class="block" id="experiencia" aria-labelledby="t-exp">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>02</span>
+                <h2 id="t-exp">Experiência</h2>
+              </div>
+              <p>Onde o backend, a infra e os eventos acontecem todo dia.</p>
             </div>
-            <p>Cada um abre no terminal com o texto completo.</p>
-          </div>
-          <div class="grid grid-frame projects" id="projects"></div>
-        </section>
+            <div class="two-cols">
+              <div class="prose experience" id="sobre-exp"></div>
+              <div class="cell edu">
+                <h3>Formação</h3>
+                <div class="prose" id="sobre-edu"></div>
+              </div>
+            </div>
+          </section>
 
-        <section id="ao-vivo" class="block" aria-labelledby="t-live">
-          <div class="rule" aria-hidden="true"></div>
-          <div class="block-head">
-            <div class="block-title">
-              <span>03</span>
-              <h2 id="t-live">Ao vivo</h2>
+          <section class="block" aria-labelledby="t-work">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>03</span>
+                <h2 id="t-work">Como eu trabalho</h2>
+              </div>
+              <p>Processo, testes e observabilidade.</p>
             </div>
-            <p>
-              Atualiza a cada 5s a partir de <code>/api/status</code>. Última leitura
-              <span class="mono strong" id="last-read">—</span>.
+            <div class="prose narrow-prose" id="sobre-work"></div>
+          </section>
+        </div>
+
+        <div id="page-projetos" hidden>
+          <section class="page-hero" aria-labelledby="pg-proj">
+            <p class="eyebrow">/projetos</p>
+            <h1 id="pg-proj">Projetos</h1>
+            <p class="lede">
+              Do RAG ao hardware. Filtre por área, leia o texto completo e abra qualquer um no terminal.
             </p>
+          </section>
+          <div class="chip-row filters" id="proj-filters" role="group" aria-label="Filtrar por área"></div>
+          <div class="grid-frame master-detail">
+            <div class="master" id="proj-list" role="listbox" aria-label="Projetos"></div>
+            <article class="cell detail" id="proj-detail" aria-labelledby="pd-name"></article>
           </div>
-          <div class="grid grid-frame stats" id="stats"></div>
-          <h3 class="table-title">rotas</h3>
-          <div class="table-wrap">
-            <table class="data" id="routes">
-              <thead>
-                <tr>
-                  <th scope="col">rota</th>
-                  <th scope="col">reqs</th>
-                  <th scope="col">p50</th>
-                  <th scope="col">p95</th>
-                  <th scope="col" class="wide">erros</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </section>
+        </div>
 
-        <section id="arquitetura" class="block" aria-labelledby="t-arch">
-          <div class="rule" aria-hidden="true"></div>
-          <div class="block-head">
-            <div class="block-title">
-              <span>04</span>
-              <h2 id="t-arch">Arquitetura</h2>
+        <div id="page-mcp" hidden>
+          <section class="page-hero" aria-labelledby="pg-mcp">
+            <p class="eyebrow">/mcp</p>
+            <h1 id="pg-mcp">MCP</h1>
+            <p class="lede">
+              Este site também é um servidor MCP. Conecte no seu cliente e pergunte sobre mim, liste projetos e leia as
+              métricas sem sair do editor.
+            </p>
+          </section>
+
+          <section class="block" aria-labelledby="t-conn">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>01</span>
+                <h2 id="t-conn">Conectar</h2>
+              </div>
+              <p>Um comando. O servidor responde por HTTP, com o mesmo limite de perguntas do terminal.</p>
             </div>
-            <p>Cada requisição sua acende o caminho que percorreu. Rode um comando no terminal e veja.</p>
-          </div>
-          <div class="grid grid-frame arch">
+            <div class="seg-tabs" id="mcp-clients" role="tablist" aria-label="Cliente"></div>
+            <div class="code-box">
+              <pre class="term-pre" id="mcp-install"></pre>
+              <button type="button" class="copy-btn on-term" id="mcp-copy">copiar</button>
+            </div>
+          </section>
+
+          <section class="block" aria-labelledby="t-tools">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>02</span>
+                <h2 id="t-tools">Ferramentas</h2>
+              </div>
+              <p>Escolha uma, mude o argumento e chame. É a mesma chamada que o Claude faria, no /mcp de verdade.</p>
+            </div>
+            <div class="grid-frame master-detail">
+              <div class="master" id="mcp-tools" role="listbox" aria-label="Ferramentas"></div>
+              <div class="cell playground">
+                <form id="mcp-form" class="call-form">
+                  <label id="mcp-arg-wrap" class="field grow">
+                    <span class="mono muted small" id="mcp-arg-name"></span>
+                    <input id="mcp-arg" class="input mono" spellcheck="false" maxlength="500" />
+                  </label>
+                  <span id="mcp-no-arg" class="grow mono muted small" hidden>sem argumentos</span>
+                  <button type="submit" class="btn btn-primary" id="mcp-call">chamar</button>
+                </form>
+                <div class="io">
+                  <span class="mono muted small">→ request · tools/call</span>
+                  <pre class="term-pre" id="mcp-req"></pre>
+                </div>
+                <div class="io" aria-live="polite">
+                  <span class="mono muted small" id="mcp-res-head">← response</span>
+                  <pre class="term-pre tall" id="mcp-res">chame a ferramenta para ver a resposta</pre>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="block" aria-labelledby="t-srv">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>03</span>
+                <h2 id="t-srv">Servidores</h2>
+              </div>
+              <p>Dois dos meus projetos falam MCP.</p>
+            </div>
+            <div class="grid grid-frame servers" id="mcp-servers"></div>
+          </section>
+        </div>
+
+        <div id="page-contato" hidden>
+          <section class="page-hero" aria-labelledby="pg-contato">
+            <p class="eyebrow">/contato</p>
+            <h1 id="pg-contato">Contato</h1>
+            <p class="lede">Vaga, projeto ou só uma conversa sobre backend, infra e IA.</p>
+          </section>
+          <div class="grid-frame two-cols-frame">
             <div class="cell">
-              <svg id="diagram-wide" class="diagram wide" role="img" aria-label="Diagrama da arquitetura"></svg>
-              <svg id="diagram-narrow" class="diagram narrow" role="img" aria-label="Diagrama da arquitetura"></svg>
+              <form id="contact-form" class="contact-form" novalidate hidden>
+                <fieldset>
+                  <legend class="muted small">Assunto</legend>
+                  <div class="chip-row" id="c-reasons" role="radiogroup" aria-label="Assunto"></div>
+                </fieldset>
+                <div class="field-pair">
+                  <label class="field">
+                    <span class="muted small">Nome</span>
+                    <input id="c-name" class="input" autocomplete="name" maxlength="100" />
+                    <span class="field-error" data-error="name" role="alert" hidden></span>
+                  </label>
+                  <label class="field">
+                    <span class="muted small">E-mail</span>
+                    <input id="c-email" class="input" type="email" autocomplete="email" maxlength="200" />
+                    <span class="field-error" data-error="email" role="alert" hidden></span>
+                  </label>
+                </div>
+                <label class="field">
+                  <span class="field-label muted small"
+                    ><span>Mensagem</span><span class="mono" id="c-count">0/1000</span></span
+                  >
+                  <textarea id="c-msg" class="input" rows="7" maxlength="1000"></textarea>
+                  <span class="field-error" data-error="message" role="alert" hidden></span>
+                </label>
+                <!-- honeypot: hidden from people, filled by bots -->
+                <label class="hp" aria-hidden="true"
+                  >Site <input id="c-website" tabindex="-1" autocomplete="off"
+                /></label>
+                <div class="send-row">
+                  <button type="submit" class="btn btn-primary" id="c-send">
+                    Enviar mensagem<svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M5 12h14M12 5l7 7-7 7"></path>
+                    </svg>
+                  </button>
+                  <span class="mono muted small" id="c-limit">POST /api/contact</span>
+                </div>
+                <p class="form-status" id="c-status" role="status"></p>
+              </form>
+              <div id="c-sent" class="sent" role="status" tabindex="-1" hidden>
+                <pre class="term-pre" id="c-receipt"></pre>
+                <p class="thanks" id="c-thanks"></p>
+                <div><button type="button" class="btn btn-line btn-mono" id="c-again">enviar outra</button></div>
+              </div>
+              <div id="c-off" class="off-note" hidden>
+                <span class="mono muted small">formulário desligado</span>
+                <p>
+                  O envio por aqui ainda não está ligado neste servidor. Use um dos canais ao lado: respondo por todos.
+                </p>
+              </div>
             </div>
-            <div class="cell log">
-              <span class="muted small">suas últimas requisições</span>
-              <ol id="request-log" aria-live="off"></ol>
-            </div>
+            <aside class="cell channels" aria-label="Contato direto">
+              <h2>Direto</h2>
+              <div id="c-channels"></div>
+              <p class="muted small">Prefere o terminal? <code>open contato</code> traz você aqui de qualquer lugar.</p>
+            </aside>
           </div>
-        </section>
+        </div>
       </main>
 
       <footer class="foot">
