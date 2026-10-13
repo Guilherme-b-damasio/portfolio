@@ -1338,6 +1338,10 @@ a:hover {
 .seg-tabs button + button {
   border-left: 1px solid var(--color-divider);
 }
+/* Many tabs on a narrow screen: scroll sideways instead of hiding the last ones. */
+.seg-tabs.scrolls {
+  overflow-x: auto;
+}
 .seg-tabs button[aria-selected="true"] {
   background: var(--color-text);
   color: var(--color-bg);
@@ -1726,6 +1730,132 @@ textarea.input {
 }
 .signal-list .fact-row dd {
   font-size: 13px;
+}
+
+/* ---------- /voce: the handshake, byte by byte ---------- */
+.hex-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.ja4-code {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: clamp(16px, 3.4vw, 26px);
+  overflow-wrap: anywhere;
+}
+.ja4-code span:nth-child(odd) {
+  color: var(--color-accent-text);
+}
+.ja4-legend {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  font-size: 13px;
+}
+.ja4-legend div {
+  display: flex;
+  gap: 6px;
+}
+.ja4-legend dt {
+  font-weight: 700;
+}
+.ja4-legend dd {
+  margin: 0;
+  color: var(--color-muted);
+}
+.hex-dump {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  padding: var(--space-3);
+  background: var(--term-bg);
+  color: var(--term-ink);
+  border-radius: var(--radius-sm);
+  max-height: 420px;
+  overflow: auto;
+}
+.hex-row {
+  display: flex;
+  gap: 2px;
+  white-space: nowrap;
+}
+.hex-off {
+  color: var(--term-dim);
+  margin-right: var(--space-3);
+  user-select: none;
+}
+.hb {
+  padding: 0 2px;
+  border-radius: 2px;
+  cursor: default;
+}
+/* Field kinds: quiet framing, warmer for what fingerprints the client. */
+.k-record,
+.k-handshake {
+  background: color-mix(in srgb, var(--term-ink) 8%, transparent);
+}
+.k-version,
+.k-random,
+.k-session,
+.k-compression {
+  background: color-mix(in srgb, var(--term-ink) 16%, transparent);
+}
+.k-ciphers {
+  background: color-mix(in srgb, var(--term-accent) 30%, transparent);
+}
+.k-extension {
+  background: color-mix(in srgb, var(--term-accent) 14%, transparent);
+}
+.k-extension.alt {
+  background: color-mix(in srgb, var(--term-accent) 24%, transparent);
+}
+.k-grease {
+  background: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--term-warn) 30%, transparent) 0 3px,
+    transparent 3px 6px
+  );
+}
+.hb.on {
+  background: var(--term-accent);
+  color: var(--term-bg);
+}
+.hex-caption {
+  margin: 0;
+  min-height: 1.5em;
+  overflow-wrap: anywhere;
+}
+.hex-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.hex-field {
+  min-height: 32px;
+  padding: 0 8px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--term-ink);
+  background: var(--term-bg);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.hex-field.k-ciphers,
+.hex-field.k-extension,
+.hex-field.k-grease {
+  border-color: var(--term-accent);
+}
+.hex-field[aria-pressed="true"] {
+  background: var(--term-accent);
+  color: var(--term-bg);
+}
+.hex-field:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 @media (max-width: 759px) {

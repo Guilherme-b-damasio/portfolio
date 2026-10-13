@@ -222,3 +222,31 @@ export function scanHeadline({ summary }) {
     return `Nada falsificado, mas ${exposures} ${exposures === 1 ? "coisa exposta" : "coisas expostas"} que dá para esconder.`;
   return "Nada contraditório e nada exposto que dê para esconder. Raro.";
 }
+
+/** For each byte of the dump, the index of the field it belongs to (or -1), from the server's annotations. */
+export function fieldOfByte(byteCount, fields) {
+  const owner = new Array(byteCount).fill(-1);
+  fields.forEach((f, i) => {
+    for (let b = f.offset; b < Math.min(byteCount, f.offset + f.length); b++) owner[b] = i;
+  });
+  return owner;
+}
+
+const TLS_VERSIONS = { 13: "TLS 1.3", 12: "TLS 1.2", 11: "TLS 1.1", 10: "TLS 1.0", s3: "SSL 3", s2: "SSL 2" };
+
+/** "t13d1516h2_8daaf6152771_806a8c22fdea" → each piece with what it means, for the page to explain. */
+export function ja4Parts(ja4) {
+  const m = /^([tqd])(\w\w)([di])(\d\d)(\d\d)(\w\w)_(\w{12})_(\w{12})$/.exec(ja4 ?? "");
+  if (!m) return [];
+  const [, proto, version, sni, ciphers, extensions, alpn, cipherHash, extHash] = m;
+  return [
+    { text: proto, meaning: proto === "t" ? "TCP" : proto === "q" ? "QUIC" : "DTLS" },
+    { text: version, meaning: TLS_VERSIONS[version] ?? "versão desconhecida" },
+    { text: sni, meaning: sni === "d" ? "com nome de domínio (SNI)" : "sem SNI, por IP" },
+    { text: ciphers, meaning: `${Number(ciphers)} cifras` },
+    { text: extensions, meaning: `${Number(extensions)} extensões` },
+    { text: alpn, meaning: alpn === "00" ? "sem ALPN" : `ALPN ${alpn}` },
+    { text: `_${cipherHash}`, meaning: "hash das cifras, ordenadas" },
+    { text: `_${extHash}`, meaning: "hash das extensões e assinaturas" },
+  ];
+}

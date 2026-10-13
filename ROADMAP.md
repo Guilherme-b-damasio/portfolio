@@ -72,10 +72,12 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
       (UA trocado, fuso falsificado pela metade, GPU impossível para o sistema, automação, WebRTC, navegador
       defasado). Nada é guardado
 - [ ] Fingerprint TLS (JA4) no raio-X: o UA diz Chrome, o handshake diz Python
-  - [ ] Parser do ClientHello + cálculo do JA4, testado com handshakes reais gerados no teste
-  - [ ] Listener TLS próprio com "tap" do ClientHello e ordem crua dos headers HTTP/1.1
+  - [x] Parser do ClientHello + cálculo do JA4, testado com o exemplo da especificação e handshakes reais
+  - [x] Listener TLS próprio com "tap" do ClientHello e ordem crua dos headers HTTP/1.1
+  - [x] PROXY protocol v1/v2 no tap, para o IP do visitante sobreviver ao passthrough
+  - [x] Hex dump anotado do handshake em `/voce`, com galeria de handshakes reais
   - [ ] Fingerprint HTTP/2 (SETTINGS, WINDOW_UPDATE, ordem dos pseudo-headers)
-  - [ ] Manifests em `deploy/` para o subdomínio com passthrough TCP
+  - [x] Manifest de exemplo em `k8s/scan-tls-passthrough.example.yaml`
   - [ ] **[dono]** IngressRouteTCP com passthrough no Traefik e certificado montado no pod
 - [ ] Teste de vazamento de DNS: servidor DNS autoritativo próprio (UDP, `node:dgram`) para um subdomínio;
       a página resolve um nome aleatório e mostra qual resolvedor perguntou (provedor x VPN)

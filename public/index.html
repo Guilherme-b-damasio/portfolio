@@ -447,11 +447,28 @@
             <div class="grid-frame layer-grid" id="scan-layers"></div>
           </section>
 
-          <section class="block" aria-labelledby="t-curl">
+          <section class="block" aria-labelledby="t-handshake">
             <div class="rule" aria-hidden="true"></div>
             <div class="block-head">
               <div class="block-title">
                 <span>04</span>
+                <h2 id="t-handshake">O handshake, byte a byte</h2>
+              </div>
+              <p id="handshake-intro">
+                O primeiro pacote de toda conexão HTTPS é o ClientHello. Ele é escrito pela biblioteca TLS, não pelo
+                navegador, e por isso entrega quem está do outro lado mesmo com o User-Agent trocado.
+              </p>
+            </div>
+            <div class="seg-tabs scrolls" id="handshake-tabs" role="tablist" aria-label="Handshake"></div>
+            <p class="muted small" id="handshake-client"></p>
+            <div class="cell hex-box" id="handshake"></div>
+          </section>
+
+          <section class="block" aria-labelledby="t-curl">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>05</span>
                 <h2 id="t-curl">Sem navegador</h2>
               </div>
               <p>O mesmo scan responde a qualquer cliente HTTP. Rode no seu terminal e veja o que ele entrega.</p>

@@ -1,0 +1,61 @@
+# Optional: let the visitor scan read each visitor's own TLS handshake (JA4).
+#
+# Normally Traefik terminates TLS and the app only sees plain HTTP. Here one extra host is
+# routed as raw TCP (passthrough): Traefik picks the backend by SNI without decrypting, and the
+# app terminates TLS itself on port 8443, where it reads the ClientHello before the handshake.
+#
+# Not applied by anything in this repo. To use it, copy into the infra repo, replace the host,
+# and patch the Deployment as shown at the bottom.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: portfolio-scan
+  namespace: portfolio
+spec:
+  secretName: portfolio-scan-tls
+  dnsNames: [scan.portfolio.example.com] # TODO: your host
+  issuerRef: { kind: ClusterIssuer, name: letsencrypt-teste } # switch to the production issuer once it works
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: portfolio-scan
+  namespace: portfolio
+spec:
+  selector: { app: portfolio }
+  ports: [{ port: 8443, targetPort: tls, name: tls }]
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: portfolio-scan
+  namespace: portfolio
+spec:
+  entryPoints: [websecure]
+  routes:
+    - match: HostSNI(`scan.portfolio.example.com`) # TODO: your host
+      services:
+        - name: portfolio-scan
+          port: 8443
+          # Without this the app would see every visitor as Traefik's pod IP. In newer Traefik
+          # versions the same setting lives in a ServersTransportTCP.
+          proxyProtocol: { version: 2 }
+  tls:
+    passthrough: true # Traefik forwards the encrypted bytes untouched
+# ---
+# Deployment patch (container "web"):
+#   ports:
+#     - { containerPort: 8443, name: tls }
+#   env:
+#     - { name: TLS_PORT, value: "8443" }
+#     - { name: TLS_CERT_FILE, value: /certs/tls.crt }
+#     - { name: TLS_KEY_FILE, value: /certs/tls.key }
+#     - { name: TLS_PROXY_PROTOCOL, value: "1" } # only because nothing but Traefik reaches port 8443
+#   volumeMounts:
+#     - { name: scan-tls, mountPath: /certs, readOnly: true }
+# Pod spec:
+#   volumes:
+#     - { name: scan-tls, secret: { secretName: portfolio-scan-tls } }
+#
+# The HTTP-01 challenge for this host must still reach cert-manager over port 80, which the
+# passthrough route doesn't touch. The app reloads the certificate files every 6 hours.

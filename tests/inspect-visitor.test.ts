@@ -9,6 +9,8 @@ const observation = (ip: string): Observation => ({
   headers: { "user-agent": UA.chromeWin, "accept-language": "pt-BR" },
   httpVersion: "1.1",
   viaProxy: true,
+  tls: null,
+  headerOrder: null,
 });
 
 const fixed = (id: string, verdict: "ok" | "info" | "exposto" | "contradicao"): ExposureCheck => ({

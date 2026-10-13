@@ -1,7 +1,9 @@
 import express, { type Request } from "express";
 import { z } from "zod";
+import type { BrowseTlsSamples } from "../../application/browse-tls-samples.js";
 import type { InspectVisitor } from "../../application/inspect-visitor.js";
 import type { ClientProbe, Observation } from "../../domain/exposure.js";
+import type { TappedConnections } from "../../domain/tls.js";
 import { rateLimit, TokenBucket } from "../middleware/rate-limit.js";
 
 // Everything the browser reports is bounded: short strings, short lists, sane numbers.
@@ -58,16 +60,22 @@ const probeSchema = z.object({
   mediaDevices: z.object({ audioinput: count, audiooutput: count, videoinput: count }).optional(),
 });
 
-function observe(req: Request): Observation {
+function observe(req: Request, tapped: TappedConnections | null): Observation {
   const headers: Record<string, string | undefined> = {};
   for (const [name, value] of Object.entries(req.headers)) {
     headers[name] = Array.isArray(value) ? value.join(", ") : value;
   }
+  const viaProxy = req.headers["x-forwarded-for"] != null;
+  const { remoteAddress, remotePort } = req.socket;
   return {
-    ip: req.ip ?? req.socket.remoteAddress ?? "",
+    ip: req.ip ?? remoteAddress ?? "",
     headers,
     httpVersion: req.httpVersion,
-    viaProxy: req.headers["x-forwarded-for"] != null,
+    viaProxy,
+    // Only a connection that reached our own TLS listener has a ClientHello on record.
+    tls: remoteAddress && remotePort ? (tapped?.fingerprint(remoteAddress, remotePort) ?? null) : null,
+    // rawHeaders alternates name, value, in the order they arrived; a proxy would have re-written it.
+    headerOrder: viaProxy ? null : req.rawHeaders.filter((_, i) => i % 2 === 0).map((h) => h.toLowerCase()),
   };
 }
 
@@ -75,9 +83,19 @@ function observe(req: Request): Observation {
  * GET scans the bare request (what curl or any script gives away); POST adds what the browser
  * reported about itself. Each scan is computed on the spot and answered; none is kept.
  */
-export function scanRouter(inspectVisitor: InspectVisitor) {
+export function scanRouter(
+  inspectVisitor: InspectVisitor,
+  tapped: TappedConnections | null = null,
+  tlsSamples: BrowseTlsSamples | null = null,
+) {
   const router = express.Router();
   const bucket = new TokenBucket(10, 10); // a DNS lookup each: cheap, but not free
+
+  // Fixed captures, the same for everyone: cacheable and outside the scan's rate limit.
+  router.get("/tls-samples", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.json(tlsSamples?.list() ?? []);
+  });
 
   router.use(rateLimit(bucket), (_req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
@@ -86,7 +104,7 @@ export function scanRouter(inspectVisitor: InspectVisitor) {
 
   router.get("/", async (req, res, next) => {
     try {
-      res.json(await inspectVisitor.execute(observe(req), null));
+      res.json(await inspectVisitor.execute(observe(req, tapped), null));
     } catch (err) {
       next(err);
     }
@@ -101,7 +119,7 @@ export function scanRouter(inspectVisitor: InspectVisitor) {
       return;
     }
     try {
-      res.json(await inspectVisitor.execute(observe(req), parsed.data satisfies ClientProbe));
+      res.json(await inspectVisitor.execute(observe(req, tapped), parsed.data satisfies ClientProbe));
     } catch (err) {
       next(err);
     }

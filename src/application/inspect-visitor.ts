@@ -9,7 +9,9 @@ import type {
   Signal,
   Verdict,
 } from "../domain/exposure.js";
+import { isGrease } from "../domain/tls.js";
 import { addressKind, ipVersion, plainIp } from "./scan/ip.js";
+import { classifyStack, FAMILY_NAMES, tlsView } from "./scan/tls-stack.js";
 import { parseUserAgent } from "./scan/user-agent.js";
 
 const ORDER: Record<Verdict, number> = { contradicao: 0, exposto: 1, info: 2, ok: 3 };
@@ -62,7 +64,12 @@ export class InspectVisitor {
 
     return {
       claimed: ctx.claimed,
-      signals: [...networkSignals(observation, reverseDns), ...httpSignals(observation), ...browserSignals(probe)],
+      signals: [
+        ...networkSignals(observation, reverseDns),
+        ...httpSignals(observation),
+        ...tlsSignals(observation),
+        ...browserSignals(probe),
+      ],
       findings,
       summary: {
         exposures: findings.filter((f) => f.verdict === "exposto").length,
@@ -70,6 +77,7 @@ export class InspectVisitor {
         checks: this.checks.length,
         probe: probe != null,
       },
+      tls: observation.tls && tlsView(observation.tls),
       scannedAt: ctx.now.toISOString(),
     };
   }
@@ -84,16 +92,43 @@ function networkSignals(observation: Observation, reverseDns: string | null): Si
     {
       layer: "rede",
       label: "caminho",
-      value: observation.viaProxy ? "você → Traefik (TLS) → este pod" : "você → este processo, direto",
+      value: observation.viaProxy
+        ? "você → Traefik (TLS) → este pod"
+        : observation.tls
+          ? "você → este processo, TLS de ponta a ponta"
+          : "você → este processo, direto",
     },
   ];
 }
 
 function httpSignals(observation: Observation): Signal[] {
-  return SHOWN_HEADERS.flatMap((name) => {
+  const headers = SHOWN_HEADERS.flatMap((name) => {
     const value = observation.headers[name];
     return value ? [{ layer: "http" as const, label: name, value }] : [];
   });
+  // Each client library writes headers in its own order; a proxy rewrites it, so it only shows without one.
+  if (observation.headerOrder?.length) {
+    headers.push({ layer: "http", label: "ordem dos cabeçalhos", value: observation.headerOrder.join(" → ") });
+  }
+  return headers;
+}
+
+function tlsSignals({ tls }: Observation): Signal[] {
+  if (!tls) return [];
+  const { hello } = tls;
+  const clean = (codes: string[]) => codes.filter((c) => !isGrease(c));
+  const rows: [string, string][] = [
+    ["JA4", tls.ja4],
+    ["pilha provável", FAMILY_NAMES[classifyStack(hello).family]],
+    ["versões", clean(hello.supportedVersions).join(", ") || hello.legacyVersion],
+    ["SNI", hello.sni ?? "nenhum"],
+    ["ALPN", hello.alpn.join(", ") || "nenhum"],
+    ["cifras", `${clean(hello.ciphers).length}${hello.ciphers.some(isGrease) ? " + GREASE" : ""}`],
+    ["extensões", `${clean(hello.extensions).length}${hello.extensions.some(isGrease) ? " + GREASE" : ""}`],
+    ["key_share", clean(hello.keyShareGroups).join(", ") || "nenhum"],
+    ["tamanho", `${hello.bytes} bytes`],
+  ];
+  return rows.map(([label, value]) => ({ layer: "tls" as const, label, value }));
 }
 
 function browserSignals(probe: ClientProbe | null): Signal[] {
