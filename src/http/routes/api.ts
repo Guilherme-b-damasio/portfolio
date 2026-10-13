@@ -18,10 +18,18 @@ export interface ApiDeps {
 
 const askBody = z.object({ question: z.string().trim().min(2).max(500) });
 
-export function apiRouter({ browse, askQuestion, reportStatus, sendContact, askLimit }: ApiDeps, logger: Logger) {
-  const api = express.Router();
+/** The ask bucket is shared with the MCP `ask` tool, so both doors spend the same questions. */
+export function askBucketFor({ askLimit }: Pick<ApiDeps, "askLimit">): TokenBucket {
   const { capacity, refillPerMinute } = askLimit ?? { capacity: 5, refillPerMinute: 5 };
-  const askBucket = new TokenBucket(capacity, refillPerMinute);
+  return new TokenBucket(capacity, refillPerMinute);
+}
+
+export function apiRouter(
+  { browse, askQuestion, reportStatus, sendContact }: ApiDeps,
+  logger: Logger,
+  askBucket: TokenBucket,
+) {
+  const api = express.Router();
 
   api.get("/profile", (_req, res) => {
     res.json(browse.profile());
