@@ -4,9 +4,11 @@ import https from "node:https";
 import net from "node:net";
 import type { AddressInfo } from "node:net";
 import os from "node:os";
+import tls from "node:tls";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TlsTap } from "../src/infrastructure/tls/tls-tap.js";
+import { proxyV2 } from "./fixtures/proxy-header.js";
 
 // A throwaway self-signed certificate, made with the openssl CLI. CI and Git for Windows both ship it.
 function selfSigned(): { key: Buffer; cert: Buffer } | null {
@@ -38,14 +40,14 @@ function selfSigned(): { key: Buffer; cert: Buffer } | null {
 const creds = selfSigned();
 
 describe.skipIf(!creds)("TlsTap in front of a real HTTPS server", () => {
-  const tap = new TlsTap(300);
+  const tap = new TlsTap({ helloTimeoutMs: 300 });
   let tcp: net.Server;
   let port: number;
 
   beforeAll(async () => {
     // The handler answers with the fingerprint of the very socket the request came in on.
     const httpsServer = https.createServer(creds!, (req, res) => {
-      const fp = tap.lookup(req.socket.remoteAddress!, req.socket.remotePort!);
+      const fp = tap.fingerprint(req.socket.remoteAddress!, req.socket.remotePort!);
       res.setHeader("content-type", "application/json");
       res.end(JSON.stringify({ ja4: fp?.ja4 ?? null, sni: fp?.hello.sni ?? null, tracked: tap.tracked }));
     });
@@ -116,5 +118,63 @@ describe.skipIf(!creds)("TlsTap in front of a real HTTPS server", () => {
     });
     expect(closedAfter).toBeGreaterThanOrEqual(250);
     expect(closedAfter).toBeLessThan(2000);
+  });
+});
+
+const CRLF = String.fromCharCode(13, 10);
+
+describe.skipIf(!creds)("TlsTap behind a TCP proxy (PROXY protocol)", () => {
+  const tap = new TlsTap({ proxyProtocol: true, helloTimeoutMs: 300 });
+  let tcp: net.Server;
+  let port: number;
+
+  beforeAll(async () => {
+    const httpsServer = https.createServer(creds!, (req, res) => {
+      const { remoteAddress, remotePort } = req.socket;
+      res.end(
+        JSON.stringify({
+          client: tap.clientAddress(remoteAddress!, remotePort!),
+          ja4: tap.fingerprint(remoteAddress!, remotePort!)?.ja4 ?? null,
+        }),
+      );
+    });
+    tcp = tap.server(httpsServer);
+    tcp.listen(0, "127.0.0.1");
+    await new Promise((resolve) => tcp.once("listening", resolve));
+    port = (tcp.address() as AddressInfo).port;
+  });
+  afterAll(() => tcp.close());
+
+  /** Plays the proxy: writes the PROXY header, then runs a real TLS session and a request over the same socket. */
+  const viaProxy = (header: Buffer | null) =>
+    new Promise<{ client: string | null; ja4: string | null } | "closed">((resolve) => {
+      const raw = net.connect(port, "127.0.0.1", () => {
+        if (header) raw.write(header);
+        const secure = tls.connect({ socket: raw, servername: "portfolio.test", rejectUnauthorized: false }, () => {
+          secure.write("GET / HTTP/1.1" + CRLF + "Host: portfolio.test" + CRLF + "Connection: close" + CRLF + CRLF);
+        });
+        let reply = "";
+        secure.on("data", (d) => (reply += d));
+        secure.on("error", () => resolve("closed"));
+        secure.on("close", () => {
+          const body = reply.split(CRLF + CRLF)[1];
+          resolve(body ? JSON.parse(body) : "closed");
+        });
+      });
+      raw.on("error", () => resolve("closed"));
+    });
+
+  it("strips the header, completes the handshake and knows the visitor's address", async () => {
+    const seen = await viaProxy(proxyV2({ address: "200.150.1.2", port: 51000 }));
+    expect(seen).toMatchObject({ client: "200.150.1.2", ja4: expect.stringMatching(/^t13d/) });
+  });
+
+  it("also takes the text form of the header", async () => {
+    const seen = await viaProxy(Buffer.from("PROXY TCP6 2804:14c::5 ::1 51000 443\r\n"));
+    expect(seen).toMatchObject({ client: "2804:14c::5" });
+  });
+
+  it("refuses a connection that skips the header", async () => {
+    expect(await viaProxy(null)).toBe("closed");
   });
 });

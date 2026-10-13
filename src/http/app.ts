@@ -4,6 +4,7 @@ import type { Logger } from "../domain/logger.js";
 import type { MetricsStore } from "../domain/metrics.js";
 import { accessLog } from "./middleware/access-log.js";
 import { recordMetrics } from "./middleware/metrics.js";
+import { proxiedClient } from "./middleware/proxied-client.js";
 import { requestId } from "./middleware/request-id.js";
 import { securityHeaders } from "./middleware/security-headers.js";
 import { apiRouter, askGuardsFor, type ApiDeps } from "./routes/api.js";
@@ -19,6 +20,7 @@ export function createApp({ metrics, logger, publicDir, ...apiDeps }: AppDeps) {
   const app = express();
   app.set("trust proxy", 1); // behind Traefik in k3s, so req.ip is the real client
   app.disable("x-powered-by");
+  app.use(proxiedClient(apiDeps.tapped));
   app.use(requestId());
   app.use(securityHeaders());
   app.use(accessLog(logger));

@@ -50,9 +50,14 @@ export interface TlsView {
   fields: HelloField[];
 }
 
-/** Fingerprints captured when a connection's TLS handshake arrived, looked up by the socket's address. */
-export interface TlsFingerprintSource {
-  lookup(remoteAddress: string, remotePort: number): TlsFingerprint | null;
+/**
+ * What was read off a connection before TLS started, looked up by the socket's address:
+ * the handshake's fingerprint and, behind a TCP proxy, the visitor's real address.
+ */
+export interface TappedConnections {
+  fingerprint(remoteAddress: string, remotePort: number): TlsFingerprint | null;
+  /** The address a trusted TCP proxy announced with the PROXY protocol; null when there was none. */
+  clientAddress(remoteAddress: string, remotePort: number): string | null;
 }
 
 /** GREASE values (RFC 8701): 0x0a0a, 0x1a1a ... 0xfafa. Chromium and Apple sprinkle them to keep servers tolerant. */

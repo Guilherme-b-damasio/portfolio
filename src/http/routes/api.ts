@@ -7,7 +7,7 @@ import type { InspectVisitor } from "../../application/inspect-visitor.js";
 import type { ReportStatus } from "../../application/report-status.js";
 import type { SendContact } from "../../application/send-contact.js";
 import type { Logger } from "../../domain/logger.js";
-import type { TlsFingerprintSource } from "../../domain/tls.js";
+import type { TappedConnections } from "../../domain/tls.js";
 import { concurrencyCap, ConcurrencyGate } from "../middleware/concurrency.js";
 import { rateLimit, TokenBucket } from "../middleware/rate-limit.js";
 import { contactRouter } from "./contact.js";
@@ -19,7 +19,7 @@ export interface ApiDeps {
   reportStatus: ReportStatus;
   sendContact: SendContact;
   inspectVisitor: InspectVisitor;
-  tlsFingerprints?: TlsFingerprintSource | null; // set when the app also serves TLS itself
+  tapped?: TappedConnections | null; // set when the app also serves TLS itself
   tlsSamples?: BrowseTlsSamples | null;
   askLimit?: { capacity: number; refillPerMinute: number };
   askConcurrency?: number; // questions answered at once, across every visitor
@@ -44,7 +44,7 @@ export function askGuardsFor(deps: Pick<ApiDeps, "askLimit" | "askConcurrency">)
 }
 
 export function apiRouter(
-  { browse, askQuestion, reportStatus, sendContact, inspectVisitor, tlsFingerprints, tlsSamples }: ApiDeps,
+  { browse, askQuestion, reportStatus, sendContact, inspectVisitor, tapped, tlsSamples }: ApiDeps,
   logger: Logger,
   { bucket: askBucket, gate: askGate }: AskGuards,
 ) {
@@ -100,7 +100,7 @@ export function apiRouter(
   });
 
   api.use("/contact", contactRouter(sendContact, logger));
-  api.use("/scan", scanRouter(inspectVisitor, tlsFingerprints ?? null, tlsSamples ?? null));
+  api.use("/scan", scanRouter(inspectVisitor, tapped ?? null, tlsSamples ?? null));
 
   return api;
 }

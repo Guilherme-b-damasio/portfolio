@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { BrowseTlsSamples } from "../../application/browse-tls-samples.js";
 import type { InspectVisitor } from "../../application/inspect-visitor.js";
 import type { ClientProbe, Observation } from "../../domain/exposure.js";
-import type { TlsFingerprintSource } from "../../domain/tls.js";
+import type { TappedConnections } from "../../domain/tls.js";
 import { rateLimit, TokenBucket } from "../middleware/rate-limit.js";
 
 // Everything the browser reports is bounded: short strings, short lists, sane numbers.
@@ -60,7 +60,7 @@ const probeSchema = z.object({
   mediaDevices: z.object({ audioinput: count, audiooutput: count, videoinput: count }).optional(),
 });
 
-function observe(req: Request, tlsSource: TlsFingerprintSource | null): Observation {
+function observe(req: Request, tapped: TappedConnections | null): Observation {
   const headers: Record<string, string | undefined> = {};
   for (const [name, value] of Object.entries(req.headers)) {
     headers[name] = Array.isArray(value) ? value.join(", ") : value;
@@ -73,7 +73,7 @@ function observe(req: Request, tlsSource: TlsFingerprintSource | null): Observat
     httpVersion: req.httpVersion,
     viaProxy,
     // Only a connection that reached our own TLS listener has a ClientHello on record.
-    tls: remoteAddress && remotePort ? (tlsSource?.lookup(remoteAddress, remotePort) ?? null) : null,
+    tls: remoteAddress && remotePort ? (tapped?.fingerprint(remoteAddress, remotePort) ?? null) : null,
     // rawHeaders alternates name, value, in the order they arrived; a proxy would have re-written it.
     headerOrder: viaProxy ? null : req.rawHeaders.filter((_, i) => i % 2 === 0).map((h) => h.toLowerCase()),
   };
@@ -85,7 +85,7 @@ function observe(req: Request, tlsSource: TlsFingerprintSource | null): Observat
  */
 export function scanRouter(
   inspectVisitor: InspectVisitor,
-  tlsSource: TlsFingerprintSource | null = null,
+  tapped: TappedConnections | null = null,
   tlsSamples: BrowseTlsSamples | null = null,
 ) {
   const router = express.Router();
@@ -104,7 +104,7 @@ export function scanRouter(
 
   router.get("/", async (req, res, next) => {
     try {
-      res.json(await inspectVisitor.execute(observe(req, tlsSource), null));
+      res.json(await inspectVisitor.execute(observe(req, tapped), null));
     } catch (err) {
       next(err);
     }
@@ -119,7 +119,7 @@ export function scanRouter(
       return;
     }
     try {
-      res.json(await inspectVisitor.execute(observe(req, tlsSource), parsed.data satisfies ClientProbe));
+      res.json(await inspectVisitor.execute(observe(req, tapped), parsed.data satisfies ClientProbe));
     } catch (err) {
       next(err);
     }

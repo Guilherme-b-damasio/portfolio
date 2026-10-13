@@ -47,7 +47,7 @@ const logger = new JsonLogger();
 // In the cluster this needs a TCP passthrough route; behind a TLS-terminating proxy there is nothing to read.
 const certFile = process.env.TLS_CERT_FILE;
 const keyFile = process.env.TLS_KEY_FILE;
-const tap = certFile && keyFile ? new TlsTap() : null;
+const tap = certFile && keyFile ? new TlsTap({ proxyProtocol: process.env.TLS_PROXY_PROTOCOL === "1" }) : null;
 
 const app = createApp({
   browse: new BrowsePortfolio(content),
@@ -55,7 +55,7 @@ const app = createApp({
   reportStatus: new ReportStatus(metrics, answerer?.model ?? null, history, budget),
   sendContact: new SendContact(mailer),
   inspectVisitor: new InspectVisitor(scanChecks(), new DnsReverseLookup()),
-  tlsFingerprints: tap,
+  tapped: tap,
   tlsSamples: new BrowseTlsSamples(await FileTlsSamples.load(path.join(root, "data", "tls-samples"))),
   metrics,
   logger,
@@ -75,10 +75,19 @@ const server = app.listen(port, () => {
 let tlsServer: Server | null = null;
 if (tap && certFile && keyFile) {
   const tlsPort = Number(process.env.TLS_PORT ?? 8443);
-  const httpsServer = https.createServer({ cert: readFileSync(certFile), key: readFileSync(keyFile) }, app);
+  const credentials = () => ({ cert: readFileSync(certFile), key: readFileSync(keyFile) });
+  const httpsServer = https.createServer(credentials(), app);
   tlsServer = tap.server(httpsServer).listen(tlsPort, () => {
     logger.info("listening", { port: tlsPort, tls: "fingerprinted" });
   });
+  // cert-manager renews the mounted secret in place; pick the new files up without a restart.
+  setInterval(() => {
+    try {
+      httpsServer.setSecureContext(credentials());
+    } catch (err) {
+      logger.error("could not reload the TLS certificate", { error: (err as Error).message });
+    }
+  }, 6 * 3_600_000).unref();
 }
 
 // k8s sends SIGTERM on rollout; finish in-flight requests before exiting.
