@@ -6,6 +6,7 @@ import { createContatoPage } from "./js/pages/contato.js";
 import { createMcpPage } from "./js/pages/mcp.js";
 import { createProjetosPage } from "./js/pages/projetos.js";
 import { createSobrePage } from "./js/pages/sobre.js";
+import { createVocePage } from "./js/pages/voce.js";
 import { createRequestsPanel } from "./js/requests-panel.js";
 import { createRouter } from "./js/router.js";
 import { createTerminal } from "./js/terminal.js";
@@ -185,6 +186,7 @@ const router = createRouter({
     projetos: createProjetosPage({ root: $("page-projetos"), act, go }),
     mcp: createMcpPage({ root: $("page-mcp") }),
     contato: createContatoPage({ root: $("page-contato") }),
+    voce: createVocePage({ root: $("page-voce") }),
   },
 });
 

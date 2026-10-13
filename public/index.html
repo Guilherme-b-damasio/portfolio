@@ -24,6 +24,7 @@
           <a href="#/projetos" data-page="projetos"><span>02</span>projetos</a>
           <a href="#/mcp" data-page="mcp"><span>03</span>mcp</a>
           <a href="#/contato" data-page="contato"><span>04</span>contato</a>
+          <a href="#/voce" data-page="voce"><span>05</span>você</a>
         </nav>
         <button type="button" id="theme" class="icon-btn" aria-label="Mudar o tema"></button>
       </header>
@@ -385,6 +386,81 @@
               <p class="muted small">Prefere o terminal? <code>open contato</code> traz você aqui de qualquer lugar.</p>
             </aside>
           </div>
+        </div>
+
+        <div id="page-voce" hidden>
+          <section class="page-hero" aria-labelledby="pg-voce">
+            <p class="eyebrow">/voce</p>
+            <h1 id="pg-voce">O que este site sabe sobre você</h1>
+            <p class="lede">
+              Seu navegador conta muita coisa sem você ver. Este scan cruza as camadas da sua conexão (rede, HTTP e
+              navegador) e aponta onde elas se contradizem, do jeito que antifraude e anti-bot fazem.
+            </p>
+            <p class="muted small">
+              Calculado na hora e devolvido só para você. Nada fica salvo nem vai para o log, e nada aqui pede
+              permissão: é o que qualquer site já consegue ler.
+            </p>
+            <div class="scan-actions">
+              <button type="button" class="btn btn-primary" id="scan-run">escanear de novo</button>
+              <label class="check-label small">
+                <input type="checkbox" id="scan-nojs" />
+                só o que o servidor vê, sem a sonda em JavaScript
+              </label>
+            </div>
+          </section>
+
+          <section class="block" aria-labelledby="t-verdict">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>01</span>
+                <h2 id="t-verdict">Veredito</h2>
+              </div>
+              <p>O que o seu User-Agent afirma e quantas vezes as outras camadas desmentem.</p>
+            </div>
+            <div class="cell scan-summary" id="scan-summary" aria-live="polite" aria-busy="true">
+              <p class="muted">escaneando…</p>
+            </div>
+          </section>
+
+          <section class="block" aria-labelledby="t-findings">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>02</span>
+                <h2 id="t-findings">Achados</h2>
+              </div>
+              <p>Contradições primeiro, depois o que está exposto. Cada um traz a evidência crua e como resolver.</p>
+            </div>
+            <ol class="finding-list" id="scan-findings"></ol>
+          </section>
+
+          <section class="block" aria-labelledby="t-layers">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>03</span>
+                <h2 id="t-layers">Camadas</h2>
+              </div>
+              <p>Tudo o que chegou, de fora para dentro.</p>
+            </div>
+            <div class="grid-frame layer-grid" id="scan-layers"></div>
+          </section>
+
+          <section class="block" aria-labelledby="t-curl">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>04</span>
+                <h2 id="t-curl">Sem navegador</h2>
+              </div>
+              <p>O mesmo scan responde a qualquer cliente HTTP. Rode no seu terminal e veja o que ele entrega.</p>
+            </div>
+            <div class="code-box">
+              <pre class="term-pre" id="scan-curl"></pre>
+              <button type="button" class="copy-btn on-term" id="scan-copy">copiar</button>
+            </div>
+          </section>
         </div>
       </main>
 
