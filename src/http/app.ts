@@ -5,6 +5,7 @@ import type { MetricsStore } from "../domain/metrics.js";
 import { accessLog } from "./middleware/access-log.js";
 import { recordMetrics } from "./middleware/metrics.js";
 import { requestId } from "./middleware/request-id.js";
+import { securityHeaders } from "./middleware/security-headers.js";
 import { apiRouter, askBucketFor, type ApiDeps } from "./routes/api.js";
 import { mcpRouter } from "./routes/mcp.js";
 
@@ -19,6 +20,7 @@ export function createApp({ metrics, logger, publicDir, ...apiDeps }: AppDeps) {
   app.set("trust proxy", 1); // behind Traefik in k3s, so req.ip is the real client
   app.disable("x-powered-by");
   app.use(requestId());
+  app.use(securityHeaders());
   app.use(accessLog(logger));
   app.use(recordMetrics(metrics));
   app.use(express.json({ limit: "4kb" }));
