@@ -5,7 +5,8 @@ import type { MetricsStore } from "../domain/metrics.js";
 import { accessLog } from "./middleware/access-log.js";
 import { recordMetrics } from "./middleware/metrics.js";
 import { requestId } from "./middleware/request-id.js";
-import { apiRouter, type ApiDeps } from "./routes/api.js";
+import { apiRouter, askBucketFor, type ApiDeps } from "./routes/api.js";
+import { mcpRouter } from "./routes/mcp.js";
 
 export interface AppDeps extends ApiDeps {
   metrics: MetricsStore;
@@ -29,7 +30,9 @@ export function createApp({ metrics, logger, publicDir, ...apiDeps }: AppDeps) {
     res.type("text/plain; version=0.0.4").send(apiDeps.reportStatus.prometheus());
   });
 
-  app.use("/api", apiRouter(apiDeps, logger));
+  const askBucket = askBucketFor(apiDeps);
+  app.use("/api", apiRouter(apiDeps, logger, askBucket));
+  app.use("/mcp", mcpRouter(apiDeps, askBucket));
   app.use(express.static(publicDir, { extensions: ["html"] }));
   app.use((_req, res) => {
     res.status(404).sendFile(path.join(publicDir, "index.html"));
