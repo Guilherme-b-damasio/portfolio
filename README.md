@@ -40,6 +40,16 @@ still start with `TODO` are left out of the index.
 | `GET /metrics`            | Prometheus text format                      |
 | `GET /healthz`            | Probes                                      |
 
+## MCP
+
+`/mcp` is a public, read-only MCP server (Streamable HTTP, stateless) with the same data as
+the terminal: `list_projects`, `get_project`, `ask` and `get_status`. `ask` spends the same
+per-visitor question bucket as `POST /api/ask`, and every call is capped at 60 a minute.
+
+```bash
+claude mcp add --transport http portfolio https://<host>/mcp
+```
+
 ## Logs
 
 Every line on stdout is one JSON object with `time`, `level` and `msg`. Each finished
