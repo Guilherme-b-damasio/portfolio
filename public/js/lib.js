@@ -59,7 +59,8 @@ export function routeLabel(method, path) {
 export function edgesFor({ route, status, generated }) {
   if (status === 404) return ["vi", "ia"];
   if (route === "POST /api/ask") {
-    if (status === 429) return ["vi", "ia", "ar"];
+    // Turned away by the rate limit or the concurrency cap before reaching the search.
+    if (status === 429 || status === 503) return ["vi", "ia", "ar"];
     return generated ? ["vi", "ia", "ar", "rb", "bc"] : ["vi", "ia", "ar", "rb"];
   }
   if (/^GET \/api\/(status|ask\/quota)/.test(route) || route === "GET /metrics" || route === "GET /healthz") {
