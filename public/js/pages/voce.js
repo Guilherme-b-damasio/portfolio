@@ -62,6 +62,7 @@ export function createVocePage({ root }) {
       }
       render(body);
       own = body.tls;
+      if (own) shown = "seu"; // a fresh handshake of their own beats any sample
       await renderHandshakes();
     } catch {
       $("#scan-summary").replaceChildren(el("p", {}, "Não consegui falar com o servidor."));
@@ -127,7 +128,7 @@ export function createVocePage({ root }) {
       .catch(() => []);
     const options = [
       ...(own
-        ? [{ id: "seu", label: "o seu", client: "o handshake que o seu navegador acabou de mandar", ...own }]
+        ? [{ ...own, id: "seu", label: "o seu", client: "o handshake que o seu navegador acabou de mandar" }]
         : []),
       ...samples,
     ];
