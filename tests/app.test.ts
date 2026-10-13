@@ -11,6 +11,7 @@ import type { LogFields, Logger } from "../src/domain/logger.js";
 import { createApp } from "../src/http/app.js";
 import { MarkdownContentSource } from "../src/infrastructure/content/markdown-content-source.js";
 import { InMemoryMetrics } from "../src/infrastructure/metrics/in-memory-metrics.js";
+import { SampledHistory } from "../src/infrastructure/metrics/sampled-history.js";
 import { Bm25Retriever, tokenize } from "../src/infrastructure/search/bm25-retriever.js";
 import { chunkContent } from "../src/infrastructure/search/chunker.js";
 
@@ -72,10 +73,12 @@ describe("http api", () => {
 
   beforeAll(async () => {
     const metrics = new InMemoryMetrics();
+    const history = new SampledHistory(metrics);
+    history.sample();
     const app = createApp({
       browse: new BrowsePortfolio(content),
       askQuestion: new AskQuestion(new Bm25Retriever(chunkContent(content)), fakeAnswerer),
-      reportStatus: new ReportStatus(metrics, fakeAnswerer.model),
+      reportStatus: new ReportStatus(metrics, fakeAnswerer.model, history),
       metrics,
       logger,
       publicDir: path.join(root, "public"),
@@ -167,5 +170,15 @@ describe("http api", () => {
     const res = await fetch(`${base}/healthz`);
     await new Promise((resolve) => setImmediate(resolve));
     expect(logs.some((l) => l.requestId === res.headers.get("x-request-id"))).toBe(false);
+  });
+
+  it("serves the sampled metrics history for the sparklines", async () => {
+    const body = await (await fetch(`${base}/api/status/history`)).json();
+    expect(body.intervalSeconds).toBe(300);
+    expect(body.points[0]).toEqual({
+      t: expect.any(Number),
+      requestsLastMinute: expect.any(Number),
+      rssMb: expect.any(Number),
+    });
   });
 });

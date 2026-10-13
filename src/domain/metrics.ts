@@ -21,3 +21,15 @@ export interface MetricsStore {
   snapshot(): MetricsSnapshot;
   prometheus(): string;
 }
+
+export interface HistoryPoint {
+  t: number; // epoch ms of the sample
+  requestsLastMinute: number;
+  rssMb: number;
+}
+
+/** A bounded, in-process series of past snapshots, for sparklines. Resets when the pod restarts. */
+export interface MetricsHistory {
+  readonly intervalMs: number;
+  points(): HistoryPoint[];
+}

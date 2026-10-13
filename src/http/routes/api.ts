@@ -52,5 +52,9 @@ export function apiRouter({ browse, askQuestion, reportStatus, askLimit }: ApiDe
     res.json(reportStatus.status());
   });
 
+  api.get("/status/history", (_req, res) => {
+    res.json(reportStatus.history());
+  });
+
   return api;
 }
