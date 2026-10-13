@@ -2,7 +2,7 @@ import express from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import type { ApiDeps } from "./api.js";
+import type { ApiDeps, AskGuards } from "./api.js";
 import { rateLimit, TokenBucket } from "../middleware/rate-limit.js";
 
 const readOnly = { readOnlyHint: true, openWorldHint: false };
@@ -12,7 +12,7 @@ const json = (data: unknown) => ({
 });
 
 /** One server per request: stateless, so there is no session to keep or leak between visitors. */
-function buildServer({ browse, askQuestion, reportStatus }: ApiDeps, askBucket: TokenBucket, clientKey: string) {
+function buildServer({ browse, askQuestion, reportStatus }: ApiDeps, { bucket, gate }: AskGuards, clientKey: string) {
   const server = new McpServer({ name: "portfolio", version: "0.1.0" });
 
   server.registerTool(
@@ -43,8 +43,18 @@ function buildServer({ browse, askQuestion, reportStatus }: ApiDeps, askBucket: 
       annotations: readOnly,
     },
     async ({ question }) => {
-      const { allowed, state } = askBucket.take(clientKey);
+      const release = gate.tryAcquire();
+      if (!release) {
+        return {
+          content: [
+            { type: "text", text: `Muitas perguntas ao mesmo tempo. Tente de novo em ${gate.retryAfterSeconds}s.` },
+          ],
+          isError: true,
+        };
+      }
+      const { allowed, state } = bucket.take(clientKey);
       if (!allowed) {
+        release();
         return {
           content: [
             { type: "text", text: `Limite de perguntas atingido. Tente de novo em ${state.retryAfterSeconds}s.` },
@@ -52,7 +62,11 @@ function buildServer({ browse, askQuestion, reportStatus }: ApiDeps, askBucket: 
           isError: true,
         };
       }
-      return json(await askQuestion.execute(question));
+      try {
+        return json(await askQuestion.execute(question));
+      } finally {
+        release();
+      }
     },
   );
 
@@ -69,12 +83,12 @@ function buildServer({ browse, askQuestion, reportStatus }: ApiDeps, askBucket: 
 }
 
 /** Streamable HTTP MCP endpoint, read-only, rate limited per visitor. */
-export function mcpRouter(deps: ApiDeps, askBucket: TokenBucket) {
+export function mcpRouter(deps: ApiDeps, askGuards: AskGuards) {
   const router = express.Router();
   const calls = new TokenBucket(60, 60);
 
   router.post("/", rateLimit(calls), async (req, res, next) => {
-    const server = buildServer(deps, askBucket, req.ip ?? "unknown");
+    const server = buildServer(deps, askGuards, req.ip ?? "unknown");
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
     res.on("close", () => {
       void transport.close();

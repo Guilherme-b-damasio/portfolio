@@ -6,7 +6,7 @@ import { accessLog } from "./middleware/access-log.js";
 import { recordMetrics } from "./middleware/metrics.js";
 import { requestId } from "./middleware/request-id.js";
 import { securityHeaders } from "./middleware/security-headers.js";
-import { apiRouter, askBucketFor, type ApiDeps } from "./routes/api.js";
+import { apiRouter, askGuardsFor, type ApiDeps } from "./routes/api.js";
 import { mcpRouter } from "./routes/mcp.js";
 
 export interface AppDeps extends ApiDeps {
@@ -32,9 +32,9 @@ export function createApp({ metrics, logger, publicDir, ...apiDeps }: AppDeps) {
     res.type("text/plain; version=0.0.4").send(apiDeps.reportStatus.prometheus());
   });
 
-  const askBucket = askBucketFor(apiDeps);
-  app.use("/api", apiRouter(apiDeps, logger, askBucket));
-  app.use("/mcp", mcpRouter(apiDeps, askBucket));
+  const askGuards = askGuardsFor(apiDeps);
+  app.use("/api", apiRouter(apiDeps, logger, askGuards));
+  app.use("/mcp", mcpRouter(apiDeps, askGuards));
   app.use(express.static(publicDir, { extensions: ["html"] }));
   app.use((_req, res) => {
     res.status(404).sendFile(path.join(publicDir, "index.html"));
