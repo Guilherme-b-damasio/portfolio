@@ -34,7 +34,12 @@ spec:
   entryPoints: [websecure]
   routes:
     - match: HostSNI(`scan.portfolio.example.com`) # TODO: your host
-      services: [{ name: portfolio-scan, port: 8443 }]
+      services:
+        - name: portfolio-scan
+          port: 8443
+          # Without this the app would see every visitor as Traefik's pod IP. In newer Traefik
+          # versions the same setting lives in a ServersTransportTCP.
+          proxyProtocol: { version: 2 }
   tls:
     passthrough: true # Traefik forwards the encrypted bytes untouched
 # ---
@@ -45,6 +50,7 @@ spec:
 #     - { name: TLS_PORT, value: "8443" }
 #     - { name: TLS_CERT_FILE, value: /certs/tls.crt }
 #     - { name: TLS_KEY_FILE, value: /certs/tls.key }
+#     - { name: TLS_PROXY_PROTOCOL, value: "1" } # only because nothing but Traefik reaches port 8443
 #   volumeMounts:
 #     - { name: scan-tls, mountPath: /certs, readOnly: true }
 # Pod spec:
