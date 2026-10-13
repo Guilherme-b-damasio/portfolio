@@ -191,6 +191,17 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
           ]),
         );
       }
+      if (res.status === 503 && body?.error) {
+        loading.remove();
+        const retry = Number(res.headers.get("retry-after")) || 5;
+        return print(
+          line([warn("! 503 "), body.error]),
+          line([
+            dim(`teto global de perguntas simultâneas; sua ficha não foi gasta. espere ~${retry}s e `),
+            runButton("tente de novo", `ask "${question.replaceAll('"', "")}"`),
+          ]),
+        );
+      }
       if (!res.ok) {
         loading.remove();
         return res.status >= 500 ? failed(res.status) : say(warn("! "), body.error ?? `erro ${res.status}`);
