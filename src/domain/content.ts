@@ -1,7 +1,9 @@
 export interface Profile {
   name: string;
+  fullName?: string;
   handle: string;
   role: string;
+  title?: string;
   location?: string;
   links: Record<string, string>;
   body: string;
