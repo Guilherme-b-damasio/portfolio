@@ -33,6 +33,13 @@ still start with `TODO` are left out of the index.
 | `GET /metrics`            | Prometheus text format                      |
 | `GET /healthz`            | Probes                                      |
 
+## Logs
+
+Every line on stdout is one JSON object with `time`, `level` and `msg`. Each finished
+request logs `requestId`, `route` (the matched route, e.g. `GET /api/projects/:slug`),
+`status` and `ms`; `/healthz` probes are skipped. Responses carry an `x-request-id`
+header: a safe incoming one (from the ingress) is reused, otherwise a UUID is generated.
+
 ## Deploy (k3s)
 
 ```bash
