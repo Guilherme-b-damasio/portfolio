@@ -109,7 +109,7 @@ describe("ReportStatus", () => {
     const metrics: MetricsStore = { record: () => {}, snapshot: () => snapshot, prometheus: () => "x 1\n" };
     const history: MetricsHistory = { intervalMs: 300_000, points: () => [] };
     const report = new ReportStatus(metrics, null, history);
-    expect(report.status()).toEqual({ ...snapshot, llm: null });
+    expect(report.status()).toEqual({ ...snapshot, llm: null, llmBudget: null });
     expect(report.prometheus()).toBe("x 1\n");
   });
 
@@ -117,5 +117,20 @@ describe("ReportStatus", () => {
     const point = { t: 1, requestsLastMinute: 2, rssMb: 60 };
     const report = new ReportStatus({} as MetricsStore, null, { intervalMs: 300_000, points: () => [point] });
     expect(report.history()).toEqual({ intervalSeconds: 300, points: [point] });
+  });
+
+  it("reports the token budget in json and prometheus format", () => {
+    const metrics: MetricsStore = {
+      record: () => {},
+      snapshot: () => ({ routes: [] }) as unknown as MetricsSnapshot,
+      prometheus: () => "x 1\n",
+    };
+    const budget = new DailyTokenBudget(1000, () => Date.UTC(2026, 9, 13, 12));
+    budget.charge(250);
+    const report = new ReportStatus(metrics, "fake", { intervalMs: 1, points: () => [] }, budget);
+    expect(report.status().llmBudget).toMatchObject({ limit: 1000, used: 250, remaining: 750 });
+    expect(report.prometheus()).toMatch(/^x 1\n/);
+    expect(report.prometheus()).toMatch(/^portfolio_llm_tokens_used_today 250$/m);
+    expect(report.prometheus()).toMatch(/^portfolio_llm_tokens_daily_limit 1000$/m);
   });
 });

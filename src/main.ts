@@ -8,6 +8,7 @@ import { createApp } from "./http/app.js";
 import { MarkdownContentSource } from "./infrastructure/content/markdown-content-source.js";
 import { JsonLogger } from "./infrastructure/logging/json-logger.js";
 import { ClaudeAnswerer } from "./infrastructure/llm/claude-answerer.js";
+import { DailyTokenBudget } from "./infrastructure/llm/daily-token-budget.js";
 import { ResendMailer } from "./infrastructure/mail/resend-mailer.js";
 import { InMemoryMetrics } from "./infrastructure/metrics/in-memory-metrics.js";
 import { SampledHistory } from "./infrastructure/metrics/sampled-history.js";
@@ -22,6 +23,8 @@ const content = await new MarkdownContentSource(process.env.CONTENT_DIR ?? path.
 const retriever = new Bm25Retriever(chunkContent(content));
 // Without a key the chat still works: it returns the retrieved passages instead of a generated answer.
 const answerer = process.env.ANTHROPIC_API_KEY ? new ClaudeAnswerer() : null;
+// Past this many tokens in a UTC day, answers fall back to the retrieved passages until midnight.
+const budget = answerer ? new DailyTokenBudget(Number(process.env.LLM_DAILY_TOKEN_BUDGET ?? 200_000)) : null;
 // The contact form only turns on when both are set; until then the page shows the direct channels.
 const mailer =
   process.env.RESEND_API_KEY && process.env.CONTACT_TO
@@ -34,8 +37,8 @@ const logger = new JsonLogger();
 
 const app = createApp({
   browse: new BrowsePortfolio(content),
-  askQuestion: new AskQuestion(retriever, answerer),
-  reportStatus: new ReportStatus(metrics, answerer?.model ?? null, history),
+  askQuestion: new AskQuestion(retriever, answerer, { budget }),
+  reportStatus: new ReportStatus(metrics, answerer?.model ?? null, history, budget),
   sendContact: new SendContact(mailer),
   metrics,
   logger,
