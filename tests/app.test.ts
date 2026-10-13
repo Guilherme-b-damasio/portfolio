@@ -7,6 +7,7 @@ import { BrowsePortfolio } from "../src/application/browse-portfolio.js";
 import { ReportStatus } from "../src/application/report-status.js";
 import type { Answerer } from "../src/domain/answer.js";
 import type { Content } from "../src/domain/content.js";
+import type { LogFields, Logger } from "../src/domain/logger.js";
 import { createApp } from "../src/http/app.js";
 import { MarkdownContentSource } from "../src/infrastructure/content/markdown-content-source.js";
 import { InMemoryMetrics } from "../src/infrastructure/metrics/in-memory-metrics.js";
@@ -63,6 +64,12 @@ describe("http api", () => {
     }),
   };
 
+  const logs: (LogFields & { msg: string })[] = [];
+  const logger: Logger = {
+    info: (msg, fields) => logs.push({ ...fields, msg }),
+    error: (msg, fields) => logs.push({ ...fields, msg }),
+  };
+
   beforeAll(async () => {
     const metrics = new InMemoryMetrics();
     const app = createApp({
@@ -70,6 +77,7 @@ describe("http api", () => {
       askQuestion: new AskQuestion(new Bm25Retriever(chunkContent(content)), fakeAnswerer),
       reportStatus: new ReportStatus(metrics, fakeAnswerer.model),
       metrics,
+      logger,
       publicDir: path.join(root, "public"),
       askLimit: { capacity: 3, refillPerMinute: 1 },
     });
@@ -132,5 +140,32 @@ describe("http api", () => {
   it("serves the page and falls back to it on unknown paths", async () => {
     expect((await fetch(`${base}/`)).headers.get("content-type")).toMatch(/html/);
     expect((await fetch(`${base}/qualquer-coisa`)).status).toBe(404);
+  });
+
+  it("gives every response an x-request-id and logs one line per request", async () => {
+    const res = await fetch(`${base}/api/projects/docsage`);
+    const id = res.headers.get("x-request-id");
+    expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(logs.find((l) => l.requestId === id)).toMatchObject({
+      msg: "request",
+      route: "GET /api/projects/:slug",
+      status: 200,
+      ms: expect.any(Number),
+    });
+  });
+
+  it("keeps a safe incoming x-request-id and replaces an unsafe one", async () => {
+    const kept = await fetch(`${base}/api/profile`, { headers: { "x-request-id": "traefik-abc.123" } });
+    expect(kept.headers.get("x-request-id")).toBe("traefik-abc.123");
+
+    const replaced = await fetch(`${base}/api/profile`, { headers: { "x-request-id": "<script>" } });
+    expect(replaced.headers.get("x-request-id")).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("does not log health probes", async () => {
+    const res = await fetch(`${base}/healthz`);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(logs.some((l) => l.requestId === res.headers.get("x-request-id"))).toBe(false);
   });
 });
