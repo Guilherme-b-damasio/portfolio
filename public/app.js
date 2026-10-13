@@ -132,10 +132,19 @@ createRequestsPanel({
   list: $("my-requests-list"),
   close: $("my-requests-close"),
   showAuto: $("my-requests-auto"),
+  tabs: [
+    { tab: $("req-tab-list"), view: $("req-view-list") },
+    { tab: $("req-tab-arch"), view: $("req-view-arch") },
+  ],
 });
 
 // ---------- live panel and diagram ----------
-const diagram = createDiagram({ wide: $("diagram-wide"), narrow: $("diagram-narrow"), log: $("request-log") });
+const diagram = createDiagram({
+  wide: $("diagram-wide"),
+  narrow: $("diagram-narrow"),
+  extra: [$("my-requests-diagram")],
+  log: $("request-log"),
+});
 createLivePanel({
   facts: $("facts"),
   stats: $("stats"),

@@ -24,16 +24,6 @@
           <a href="#ao-vivo">Ao vivo</a>
           <a href="#arquitetura">Arquitetura</a>
         </nav>
-        <button
-          type="button"
-          id="my-requests-btn"
-          class="req-btn"
-          aria-expanded="false"
-          aria-controls="my-requests"
-          aria-label="Minhas requisições"
-        >
-          <span class="req-btn-label">minhas requisições</span><span class="req-badge" id="my-requests-count">0</span>
-        </button>
         <button type="button" id="theme" class="icon-btn" aria-label="Mudar o tema"></button>
       </header>
 
@@ -176,13 +166,38 @@
       </footer>
     </div>
 
+    <button
+      type="button"
+      id="my-requests-btn"
+      class="req-fab"
+      aria-expanded="false"
+      aria-controls="my-requests"
+      aria-label="Minhas requisições"
+    >
+      <span class="req-fab-label">minhas requisições</span><span class="req-fab-short" aria-hidden="true">reqs</span
+      ><span class="req-badge" id="my-requests-count">0</span>
+    </button>
     <aside id="my-requests" class="req-panel" aria-labelledby="my-requests-title" hidden>
       <div class="req-head">
         <h2 id="my-requests-title">Minhas requisições</h2>
         <button type="button" id="my-requests-close" class="req-close" aria-label="Fechar">×</button>
       </div>
-      <label class="req-toggle"><input type="checkbox" id="my-requests-auto" /> mostrar as automáticas</label>
-      <ol id="my-requests-list" class="req-list" aria-live="off"></ol>
+      <div class="req-tabs" role="tablist" aria-label="Visão">
+        <button type="button" role="tab" id="req-tab-list" aria-selected="true" aria-controls="req-view-list">
+          requisições
+        </button>
+        <button type="button" role="tab" id="req-tab-arch" aria-selected="false" aria-controls="req-view-arch">
+          arquitetura
+        </button>
+      </div>
+      <div id="req-view-list" class="req-view" role="tabpanel" aria-labelledby="req-tab-list">
+        <label class="req-toggle"><input type="checkbox" id="my-requests-auto" /> mostrar as automáticas</label>
+        <ol id="my-requests-list" class="req-list" aria-live="off"></ol>
+      </div>
+      <div id="req-view-arch" class="req-view" role="tabpanel" aria-labelledby="req-tab-arch" hidden>
+        <svg id="my-requests-diagram" class="diagram req-diagram" role="img" aria-label="Diagrama da arquitetura"></svg>
+        <p class="req-note">Acende o caminho de cada requisição sua.</p>
+      </div>
       <p class="req-note">Só deste navegador, nesta visita.</p>
     </aside>
 
