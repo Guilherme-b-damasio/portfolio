@@ -1,7 +1,13 @@
 import type { RequestHandler } from "express";
 
 /** In-memory token bucket per client IP. Good enough for one replica; move to Redis if the deployment scales out. */
-export function rateLimit({ capacity, refillPerMinute }: { capacity: number; refillPerMinute: number }): RequestHandler {
+export function rateLimit({
+  capacity,
+  refillPerMinute,
+}: {
+  capacity: number;
+  refillPerMinute: number;
+}): RequestHandler {
   const buckets = new Map<string, { tokens: number; updatedAt: number }>();
 
   return (req, res, next) => {

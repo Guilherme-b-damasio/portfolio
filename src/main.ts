@@ -30,7 +30,13 @@ const app = createApp({
 
 const server = app.listen(port, () => {
   console.log(
-    JSON.stringify({ level: "info", msg: "listening", port, projects: content.projects.length, llm: answerer?.model ?? "off" }),
+    JSON.stringify({
+      level: "info",
+      msg: "listening",
+      port,
+      projects: content.projects.length,
+      llm: answerer?.model ?? "off",
+    }),
   );
 });
 

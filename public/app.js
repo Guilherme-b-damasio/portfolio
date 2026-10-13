@@ -58,7 +58,13 @@ const commands = {
   async whoami() {
     const { body } = await api("/api/profile");
     print(el("b", {}, body.name), dim(`  ${body.role}${body.location ? " · " + body.location : ""}`));
-    print(body.body.split("\n").filter((l) => !l.startsWith("##")).join("\n").trim());
+    print(
+      body.body
+        .split("\n")
+        .filter((l) => !l.startsWith("##"))
+        .join("\n")
+        .trim(),
+    );
   },
 
   async ls(args) {
@@ -106,7 +112,9 @@ const commands = {
     print(
       dim(
         `bm25 ${body.latencyMs.retrieval.toFixed(1)}ms` +
-          (gen != null ? ` · ${body.model} ${Math.round(gen)}ms · ${body.usage.inputTokens}→${body.usage.outputTokens} tokens` : "") +
+          (gen != null
+            ? ` · ${body.model} ${Math.round(gen)}ms · ${body.usage.inputTokens}→${body.usage.outputTokens} tokens`
+            : "") +
           ` · total ${ms}ms · rate limit restante ${res.headers.get("x-ratelimit-remaining")}`,
       ),
     );
@@ -182,7 +190,9 @@ async function renderProfile() {
   const links = document.getElementById("links");
   for (const [label, href] of Object.entries(body.links ?? {})) {
     if (href.includes("TODO")) continue;
-    links.append(el("a", { href: label === "email" ? `mailto:${href}` : href, target: "_blank", rel: "noopener" }, label));
+    links.append(
+      el("a", { href: label === "email" ? `mailto:${href}` : href, target: "_blank", rel: "noopener" }, label),
+    );
   }
 }
 
@@ -198,13 +208,26 @@ async function renderProjects() {
     const actions = el("div", { className: "card-actions" }, open);
     if (p.repo) actions.append(el("a", { href: p.repo, target: "_blank", rel: "noopener" }, "repo"));
     grid.append(
-      el("article", { className: "card" }, el("h3", {}, p.name), el("p", {}, p.summary), el("div", { className: "tags" }, p.stack.map((s) => el("span", {}, s))), actions),
+      el(
+        "article",
+        { className: "card" },
+        el("h3", {}, p.name),
+        el("p", {}, p.summary),
+        el(
+          "div",
+          { className: "tags" },
+          p.stack.map((s) => el("span", {}, s)),
+        ),
+        actions,
+      ),
     );
   }
 }
 
 function formatUptime(s) {
-  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
+  const d = Math.floor(s / 86400),
+    h = Math.floor((s % 86400) / 3600),
+    m = Math.floor((s % 3600) / 60);
   return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m ${s % 60}s`;
 }
 
@@ -212,17 +235,29 @@ async function renderStatus() {
   try {
     const { body } = await api("/api/status");
     const stat = (value, label) => el("div", { className: "stat" }, el("b", {}, value), el("span", {}, label));
-    document.getElementById("stats").replaceChildren(
-      stat(formatUptime(body.uptimeSeconds), "uptime"),
-      stat(String(body.requestsLastMinute), "requests no último minuto"),
-      stat(`${body.memory.rssMb} MB`, "memória (rss)"),
-      stat(body.runtime.pod.slice(-12), body.runtime.node_name ? `pod @ ${body.runtime.node_name}` : "host"),
-    );
+    document
+      .getElementById("stats")
+      .replaceChildren(
+        stat(formatUptime(body.uptimeSeconds), "uptime"),
+        stat(String(body.requestsLastMinute), "requests no último minuto"),
+        stat(`${body.memory.rssMb} MB`, "memória (rss)"),
+        stat(body.runtime.pod.slice(-12), body.runtime.node_name ? `pod @ ${body.runtime.node_name}` : "host"),
+      );
     document.querySelector("#routes tbody").replaceChildren(
       ...body.routes
         .filter((r) => !r.route.endsWith("static"))
         .sort((a, b) => b.count - a.count)
-        .map((r) => el("tr", {}, el("td", {}, r.route), el("td", {}, r.count), el("td", {}, `${r.p50Ms}ms`), el("td", {}, `${r.p95Ms}ms`), el("td", {}, r.errors))),
+        .map((r) =>
+          el(
+            "tr",
+            {},
+            el("td", {}, r.route),
+            el("td", {}, r.count),
+            el("td", {}, `${r.p50Ms}ms`),
+            el("td", {}, `${r.p95Ms}ms`),
+            el("td", {}, r.errors),
+          ),
+        ),
     );
     document.getElementById("build").textContent = `build ${body.build.commit.slice(0, 7)} · node ${body.runtime.node}`;
   } catch {

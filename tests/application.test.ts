@@ -7,7 +7,11 @@ import type { Content } from "../src/domain/content.js";
 import type { MetricsSnapshot, MetricsStore } from "../src/domain/metrics.js";
 import type { Hit, Retriever } from "../src/domain/search.js";
 
-const hit: Hit = { chunk: { id: "a.md#1", source: "a.md › Intro", text: "texto" }, score: 1.2, matchedTerms: ["texto"] };
+const hit: Hit = {
+  chunk: { id: "a.md#1", source: "a.md › Intro", text: "texto" },
+  score: 1.2,
+  matchedTerms: ["texto"],
+};
 
 const fixedRetriever = (hits: Hit[]): Retriever & { calls: [string, number | undefined][] } => {
   const calls: [string, number | undefined][] = [];
@@ -37,7 +41,10 @@ describe("AskQuestion", () => {
 
   it("skips generation when nothing was retrieved", async () => {
     let called = false;
-    const answerer: Answerer = { model: "fake", answer: async () => ((called = true), { text: "", inputTokens: 0, outputTokens: 0 }) };
+    const answerer: Answerer = {
+      model: "fake",
+      answer: async () => ((called = true), { text: "", inputTokens: 0, outputTokens: 0 }),
+    };
     const result = await new AskQuestion(fixedRetriever([]), answerer).execute("pergunta");
     expect(called).toBe(false);
     expect(result.answer).toBeNull();
