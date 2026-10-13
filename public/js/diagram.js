@@ -44,9 +44,16 @@ const EDGES = {
   },
 };
 
-/** The architecture SVG (wide and narrow variants) lit by this visitor's own requests, plus the request log. */
-export function createDiagram({ wide, narrow, log }) {
-  const layouts = [build(wide, "wide", 1000, 250, 132), build(narrow, "narrow", 340, 480, 130)];
+/**
+ * The architecture SVG lit by this visitor's own requests, plus the request log.
+ * `extra` holds more narrow-layout copies (the floating panel has one); they all light together.
+ */
+export function createDiagram({ wide, narrow, extra = [], log }) {
+  const roots = [wide, narrow, ...extra];
+  const layouts = [
+    build(wide, "wide", 1000, 250, 132),
+    ...[narrow, ...extra].map((root) => build(root, "narrow", 340, 480, 130)),
+  ];
   const entries = [];
   let llm = null;
   let unlit;
@@ -76,7 +83,7 @@ export function createDiagram({ wide, narrow, log }) {
   requests.addEventListener("request", ({ detail }) => {
     const edges = edgesFor(detail);
     light(edges);
-    for (const svgNode of [wide, narrow]) {
+    for (const svgNode of roots) {
       svgNode.setAttribute("aria-label", `Diagrama da arquitetura. Última requisição: ${detail.route}`);
     }
     entries.unshift(detail);

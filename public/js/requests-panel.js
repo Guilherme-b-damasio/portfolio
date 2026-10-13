@@ -5,7 +5,7 @@ import { clock, formatMs } from "./lib.js";
 const MAX_ENTRIES = 100; // the panel is a window, not a history: older entries fall off
 
 /** Floating list of the requests this browser made during the visit, opened from the top bar. */
-export function createRequestsPanel({ button, count, panel, list, close, showAuto }) {
+export function createRequestsPanel({ button, count, panel, list, close, showAuto, tabs }) {
   const entries = [];
 
   const visible = () => entries.filter((r) => showAuto.checked || !r.auto);
@@ -51,5 +51,24 @@ export function createRequestsPanel({ button, count, panel, list, close, showAut
     if (e.key === "Escape") setOpen(false);
   });
   showAuto.addEventListener("change", render);
+
+  // Two views in the panel: the list and the live architecture diagram.
+  function selectTab(selected) {
+    for (const { tab, view } of tabs) {
+      const on = tab === selected;
+      tab.setAttribute("aria-selected", String(on));
+      tab.tabIndex = on ? 0 : -1;
+      view.hidden = !on;
+    }
+  }
+  for (const { tab } of tabs) tab.addEventListener("click", () => selectTab(tab));
+  tabs[0].tab.parentElement.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    const i = tabs.findIndex(({ tab }) => tab.getAttribute("aria-selected") === "true");
+    const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length].tab;
+    selectTab(next);
+    next.focus();
+  });
+  selectTab(tabs[0].tab);
   render();
 }

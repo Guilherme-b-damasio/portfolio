@@ -996,7 +996,7 @@ a:hover {
   flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--space-3) var(--space-8);
-  padding-block: var(--space-6) var(--space-12);
+  padding-block: var(--space-6) 88px; /* room for the floating button */
   border-top: var(--rule-w) solid transparent;
   border-image: var(--rule) 1;
   font-family: var(--font-mono);
@@ -1004,25 +1004,40 @@ a:hover {
   color: var(--color-muted);
 }
 
-/* ---------- my requests: top-bar button and floating panel ---------- */
-.req-btn {
-  min-height: 44px;
+/* ---------- my requests: floating button and the panel it opens ---------- */
+.req-fab {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 11;
+  min-height: 48px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px;
-  background: transparent;
-  color: var(--color-text);
-  border: 1px solid var(--color-divider);
-  border-radius: var(--radius-md);
+  gap: 10px;
+  padding: 0 16px;
+  background: var(--color-text);
+  color: var(--color-bg);
+  border: 1px solid var(--color-text);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
   font-family: var(--font-mono);
   font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
 }
-.req-btn:hover,
-.req-btn[aria-expanded="true"] {
+.req-fab:hover,
+.req-fab[aria-expanded="true"] {
+  background: var(--color-accent);
   border-color: var(--color-accent);
+  color: var(--color-bg);
+}
+.req-fab:hover .req-badge,
+.req-fab[aria-expanded="true"] .req-badge {
+  background: var(--color-bg);
   color: var(--color-accent-text);
+}
+.req-fab-short {
+  display: none;
 }
 .req-badge {
   min-width: 22px;
@@ -1040,7 +1055,7 @@ a:hover {
   /* left + right + max-width instead of a vw width: 100vw counts the scrollbar and pushed the panel off the edge. */
   left: 16px;
   right: 16px;
-  bottom: 16px;
+  bottom: 76px; /* sits above the 48px button */
   z-index: 10;
   max-width: 420px;
   margin-left: auto;
@@ -1085,6 +1100,48 @@ a:hover {
 .req-close:hover {
   border-color: var(--color-accent);
   color: var(--color-accent-text);
+}
+.req-tabs {
+  display: flex;
+  width: max-content;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.req-tabs button {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  cursor: pointer;
+}
+.req-tabs button + button {
+  border-left: 1px solid var(--color-divider);
+}
+.req-tabs button[aria-selected="true"] {
+  background: var(--color-text);
+  color: var(--color-bg);
+}
+.req-view {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+}
+.req-view[hidden] {
+  display: none;
+}
+/* The narrow layout, capped by height so it fits the panel on short screens. */
+.req-diagram.diagram {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: min(52vh, 420px);
+  margin-inline: auto;
 }
 .req-toggle {
   display: flex;
@@ -1141,9 +1198,12 @@ a:hover {
   color: var(--color-muted);
 }
 @media (max-width: 559px) {
-  .req-btn-label,
+  .req-fab-label,
   .req-list li > span:first-child {
     display: none;
+  }
+  .req-fab-short {
+    display: inline;
   }
   .req-list li {
     grid-template-columns: minmax(0, 1fr) 6ch 7ch;
