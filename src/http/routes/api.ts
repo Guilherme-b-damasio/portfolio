@@ -23,6 +23,10 @@ export function apiRouter({ browse, askQuestion, reportStatus, askLimit }: ApiDe
     res.json(browse.profile());
   });
 
+  api.get("/skills", (_req, res) => {
+    res.json(browse.skills());
+  });
+
   api.get("/projects", (req, res) => {
     const tag = typeof req.query.tag === "string" ? req.query.tag : undefined;
     res.json(browse.projects(tag));

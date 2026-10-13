@@ -58,6 +58,12 @@ describe("BrowsePortfolio", () => {
       { slug: "a", name: "A", summary: "", stack: [], tags: ["ia"], order: 1, body: "corpo" },
       { slug: "b", name: "B", summary: "", stack: [], tags: [], order: 2, body: "corpo" },
     ],
+    skills: [
+      {
+        title: "IA",
+        items: [{ name: "RAG", evidence: [{ where: "a", text: "t", action: { type: "live", label: "ver" } }] }],
+      },
+    ],
   };
   const browse = new BrowsePortfolio(content);
 
@@ -65,6 +71,10 @@ describe("BrowsePortfolio", () => {
     expect(browse.projects().map((p) => p.slug)).toEqual(["a", "b"]);
     expect(browse.projects("ia").map((p) => p.slug)).toEqual(["a"]);
     expect(browse.projects()[0]).not.toHaveProperty("body");
+  });
+
+  it("exposes the skill groups as loaded", () => {
+    expect(browse.skills()[0].items[0].name).toBe("RAG");
   });
 
   it("finds a project by slug", () => {

@@ -107,6 +107,14 @@ describe("http api", () => {
     expect(ia).toHaveLength(1);
   });
 
+  it("serves the skills with their evidence", async () => {
+    const groups = await (await fetch(`${base}/api/skills`)).json();
+    expect(groups.length).toBeGreaterThan(0);
+    for (const group of groups) {
+      for (const skill of group.items) expect(skill.evidence.length).toBeGreaterThan(0);
+    }
+  });
+
   it("404s on an unknown project", async () => {
     const res = await fetch(`${base}/api/projects/nope`);
     expect(res.status).toBe(404);
