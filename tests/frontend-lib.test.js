@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ago,
+  candidateAddress,
   citationParts,
   commandForSource,
   edgesFor,
@@ -11,6 +12,7 @@ import {
   hourStrip,
   parseLine,
   routeLabel,
+  scanHeadline,
   sections,
   sparkPoints,
 } from "../public/js/lib.js";
@@ -138,5 +140,22 @@ describe("front-end helpers for the v2 pages", () => {
     const { edgesFor } = await import("../public/js/lib.js");
     expect(edgesFor({ route: "POST /api/contact", status: 202 })).toEqual(["vi", "ia", "ar"]);
     expect(edgesFor({ route: "POST /mcp", status: 200 })).toEqual(["vi", "ia", "am"]);
+  });
+});
+
+describe("scan helpers", () => {
+  it("pulls the address out of an ICE candidate line", () => {
+    expect(candidateAddress("candidate:1 1 udp 2122260223 192.168.0.12 54321 typ host generation 0")).toBe(
+      "192.168.0.12",
+    );
+    expect(candidateAddress("a=candidate:2 1 udp 2122194687 3f1c.local 60000 typ host")).toBe("3f1c.local");
+    expect(candidateAddress("")).toBeNull();
+    expect(candidateAddress(undefined)).toBeNull();
+  });
+
+  it("sums the report up in one line, worst first", () => {
+    expect(scanHeadline({ summary: { contradictions: 2, exposures: 3 } })).toMatch(/^2 contradições/);
+    expect(scanHeadline({ summary: { contradictions: 0, exposures: 1 } })).toMatch(/1 coisa exposta/);
+    expect(scanHeadline({ summary: { contradictions: 0, exposures: 0 } })).toMatch(/Raro/);
   });
 });
