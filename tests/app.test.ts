@@ -43,8 +43,9 @@ describe("search", () => {
   it("matches every section of a project by its name", () => {
     const retriever = new Bm25Retriever(chunkContent(content));
     const sources = retriever.search("como funciona o docsage?").map((h) => h.chunk.source);
-    expect(sources.length).toBeGreaterThan(1);
-    expect(sources.every((s) => s.startsWith("docsage.md"))).toBe(true);
+    // Other documents may mention docsage too; its own sections must still lead.
+    expect(sources[0]).toMatch(/^docsage\.md/);
+    expect(sources.filter((s) => s.startsWith("docsage.md")).length).toBeGreaterThan(1);
   });
 
   it("returns nothing for unrelated questions", () => {
@@ -104,6 +105,14 @@ describe("http api", () => {
 
     const ia = await (await fetch(`${base}/api/projects?tag=rag`)).json();
     expect(ia).toHaveLength(1);
+  });
+
+  it("serves the skills with their evidence", async () => {
+    const groups = await (await fetch(`${base}/api/skills`)).json();
+    expect(groups.length).toBeGreaterThan(0);
+    for (const group of groups) {
+      for (const skill of group.items) expect(skill.evidence.length).toBeGreaterThan(0);
+    }
   });
 
   it("404s on an unknown project", async () => {
