@@ -6,10 +6,12 @@ import {
   citationParts,
   commandForSource,
   edgesFor,
+  fieldOfByte,
   formatUptime,
   guessCommand,
   highlightParts,
   hourStrip,
+  ja4Parts,
   parseLine,
   routeLabel,
   scanHeadline,
@@ -157,5 +159,31 @@ describe("scan helpers", () => {
     expect(scanHeadline({ summary: { contradictions: 2, exposures: 3 } })).toMatch(/^2 contradições/);
     expect(scanHeadline({ summary: { contradictions: 0, exposures: 1 } })).toMatch(/1 coisa exposta/);
     expect(scanHeadline({ summary: { contradictions: 0, exposures: 0 } })).toMatch(/Raro/);
+  });
+});
+
+describe("hex dump helpers", () => {
+  it("maps each byte to its field, leaving gaps as -1", () => {
+    const fields = [
+      { offset: 0, length: 2, label: "a" },
+      { offset: 3, length: 2, label: "b" },
+    ];
+    expect(fieldOfByte(6, fields)).toEqual([0, 0, -1, 1, 1, -1]);
+  });
+
+  it("explains every piece of a JA4", () => {
+    const parts = ja4Parts("t13d1516h2_8daaf6152771_806a8c22fdea");
+    expect(parts.map((p) => p.text).join("")).toBe("t13d1516h2_8daaf6152771_806a8c22fdea");
+    expect(parts.map((p) => p.meaning)).toEqual([
+      "TCP",
+      "TLS 1.3",
+      "com nome de domínio (SNI)",
+      "15 cifras",
+      "16 extensões",
+      "ALPN h2",
+      "hash das cifras, ordenadas",
+      "hash das extensões e assinaturas",
+    ]);
+    expect(ja4Parts("lixo")).toEqual([]);
   });
 });
