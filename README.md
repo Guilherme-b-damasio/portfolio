@@ -29,7 +29,9 @@ still start with `TODO` are left out of the index.
 | `GET /api/projects?tag=`  | Without bodies                              |
 | `GET /api/projects/:slug` |                                             |
 | `POST /api/ask`           | `{ question }`, 5 per client, refills 5/min |
+| `GET /api/ask/quota`      | The caller's remaining questions, without spending one |
 | `GET /api/status`         | Uptime, memory, pod/node, p50/p95 per route |
+| `GET /api/status/history` | In-process samples every 5 min for the last 24h (reset on restart) |
 | `GET /metrics`            | Prometheus text format                      |
 | `GET /healthz`            | Probes                                      |
 
