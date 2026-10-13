@@ -3,18 +3,22 @@ import { z } from "zod";
 import type { AskQuestion } from "../../application/ask-question.js";
 import type { BrowsePortfolio } from "../../application/browse-portfolio.js";
 import type { ReportStatus } from "../../application/report-status.js";
+import type { SendContact } from "../../application/send-contact.js";
+import type { Logger } from "../../domain/logger.js";
 import { rateLimit, TokenBucket } from "../middleware/rate-limit.js";
+import { contactRouter } from "./contact.js";
 
 export interface ApiDeps {
   browse: BrowsePortfolio;
   askQuestion: AskQuestion;
   reportStatus: ReportStatus;
+  sendContact: SendContact;
   askLimit?: { capacity: number; refillPerMinute: number };
 }
 
 const askBody = z.object({ question: z.string().trim().min(2).max(500) });
 
-export function apiRouter({ browse, askQuestion, reportStatus, askLimit }: ApiDeps) {
+export function apiRouter({ browse, askQuestion, reportStatus, sendContact, askLimit }: ApiDeps, logger: Logger) {
   const api = express.Router();
   const { capacity, refillPerMinute } = askLimit ?? { capacity: 5, refillPerMinute: 5 };
   const askBucket = new TokenBucket(capacity, refillPerMinute);
@@ -66,6 +70,8 @@ export function apiRouter({ browse, askQuestion, reportStatus, askLimit }: ApiDe
   api.get("/status/history", (_req, res) => {
     res.json(reportStatus.history());
   });
+
+  api.use("/contact", contactRouter(sendContact, logger));
 
   return api;
 }
