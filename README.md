@@ -20,6 +20,8 @@ still start with `TODO` are left out of the index.
 | `ANTHROPIC_API_KEY` | unset             | Enables generated answers; without it `/api/ask` returns only the retrieved passages |
 | `CLAUDE_MODEL`      | `claude-opus-5-5` | Model used by `/api/ask`                             |
 | `LLM_DAILY_TOKEN_BUDGET` | `200000`    | LLM tokens (input + output) per UTC day; past it `/api/ask` returns only the passages, with `degraded: "token-budget"`, until 00:00 UTC |
+| `TLS_CERT_FILE`, `TLS_KEY_FILE` | unset | Also serve HTTPS on `TLS_PORT` (default `8443`) and fingerprint each visitor's TLS handshake. Re-read every 6 h |
+| `TLS_PROXY_PROTOCOL` | unset | `1` when that port sits behind a TCP passthrough that sends the PROXY protocol; the header then becomes mandatory |
 | `ASK_MAX_CONCURRENCY` | `4`             | Questions answered at once across every visitor (HTTP and MCP); above it, 503 with `Retry-After` |
 | `GIT_SHA`, `BUILT_AT` | `dev`           | Shown in the footer and `/api/status` (set as Docker build args) |
 | `RESEND_API_KEY`, `CONTACT_TO` | unset | Turn on the contact form; messages go to `CONTACT_TO` through Resend |
@@ -39,6 +41,7 @@ still start with `TODO` are left out of the index.
 | `POST /api/contact`       | `{ reason, name, email, message }`, 3 per visitor per hour, 30 a day in total |
 | `GET /api/scan`           | What the bare request gives away (try it with curl); never cached |
 | `POST /api/scan`          | Same, plus the browser probe from `/voce`: findings where the layers contradict each other. 10 per visitor per minute |
+| `GET /api/scan/tls-samples` | Real ClientHellos captured from known clients (`data/tls-samples/`), with JA4 and every byte annotated |
 | `GET /api/status`         | Uptime, memory, pod/node, p50/p95 per route, tokens spent today (`llmBudget`) |
 | `GET /api/status/history` | In-process samples every 5 min for the last 24h (reset on restart) |
 | `GET /metrics`            | Prometheus text format, including `portfolio_llm_tokens_used_today` |
@@ -53,6 +56,29 @@ rule is an `ExposureCheck` in `src/application/scan/checks/`; it reports `contra
 layers disagree (a spoofed User-Agent, a half-spoofed time zone, automation), `exposto` when
 something could be hidden, `info` or `ok`. The report is computed per request and answered:
 no scan, IP or fingerprint is stored or logged, and the reverse DNS lookup has an 800 ms deadline.
+
+### TLS fingerprint (JA4)
+
+Behind a TLS-terminating proxy the app never sees the handshake. With `TLS_CERT_FILE` and
+`TLS_KEY_FILE` set it also listens on `TLS_PORT`, where a tap reads each connection's raw
+ClientHello before handing the socket to the HTTPS server: the parser in
+`src/infrastructure/tls/` computes [JA4](https://github.com/FoxIO-LLC/ja4) (checked against the
+spec's worked example), and the scan compares the TLS library that wrote the handshake with the
+browser the User-Agent claims. A curl or Python script wearing a Chrome User-Agent shows up as a
+contradiction. The raw header order is also reported, since no proxy rewrote it.
+
+In the cluster this needs a TCP passthrough route that sends the PROXY protocol, so the app
+still learns the visitor's address: see `k8s/scan-tls-passthrough.example.yaml`. Until then
+`/voce` shows real handshakes captured from Chromium, Python, Node.js and curl on Windows.
+
+To try it locally:
+
+```bash
+mkdir -p .certs && printf '[req]\ndistinguished_name=dn\n[dn]\n' > .certs/req.cnf
+openssl req -x509 -config .certs/req.cnf -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 7 -subj /CN=localhost -keyout .certs/key.pem -out .certs/cert.pem
+TLS_CERT_FILE=.certs/cert.pem TLS_KEY_FILE=.certs/key.pem npm run dev
+curl -sk -A "Mozilla/5.0 Chrome/152.0.0.0" https://localhost:8443/api/scan | jq '.findings[0].title'
+```
 
 ## MCP
 
