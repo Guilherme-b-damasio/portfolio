@@ -42,11 +42,11 @@ header: a safe incoming one (from the ingress) is reused, otherwise a UUID is ge
 
 ## Deploy (k3s)
 
-```bash
-docker build -t ghcr.io/<user>/portfolio:$(git rev-parse --short HEAD) \
-  --build-arg GIT_SHA=$(git rev-parse HEAD) --build-arg BUILT_AT=$(date -u +%FT%TZ) .
-kubectl create secret generic portfolio-secrets -n portfolio --from-literal=anthropic-api-key=...
-kubectl apply -f k8s/deployment.yaml
-```
+Every push to `develop` builds the image and publishes it to
+`ghcr.io/guilherme-b-damasio/portfolio:<YYYYMMDDHHmmss>-<sha>` (`.github/workflows/image.yml`);
+pull requests only build it. In the cluster, Flux image automation picks the newest tag by
+its timestamp and rolls the deployment, so there is no manual `kubectl apply`.
 
-Fill the `TODO`s in `k8s/deployment.yaml` (image registry, host, TLS issuer).
+`k8s/deployment.yaml` is a generic reference (namespace, deployment, service, ingress). The
+real manifests, host and TLS issuer live in the private infra repository. Without the
+optional `portfolio-secrets` secret the app runs retrieval-only.
