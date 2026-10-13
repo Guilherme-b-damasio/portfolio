@@ -4,6 +4,7 @@ import type { Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AskQuestion } from "../src/application/ask-question.js";
 import { BrowsePortfolio } from "../src/application/browse-portfolio.js";
+import { InspectVisitor } from "../src/application/inspect-visitor.js";
 import { ReportStatus } from "../src/application/report-status.js";
 import { ContactBudgetError, ContactDisabledError, SendContact } from "../src/application/send-contact.js";
 import type { ContactMessage, Mailer } from "../src/domain/contact.js";
@@ -88,6 +89,7 @@ describe("POST /api/contact", () => {
       askQuestion: new AskQuestion({ search: () => [] }, null),
       reportStatus: new ReportStatus(metrics, null, new SampledHistory(metrics)),
       sendContact: new SendContact(mailer),
+      inspectVisitor: new InspectVisitor([], { lookup: async () => null }),
       metrics,
       logger: silent,
       publicDir: path.resolve(import.meta.dirname, "..", "public"),

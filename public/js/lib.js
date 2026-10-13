@@ -135,7 +135,7 @@ export function commandForSource(source) {
   return section ? `cat ${slug} "${section}"` : `cat ${slug}`;
 }
 
-export const PAGES = ["inicio", "sobre", "projetos", "mcp", "contato"];
+export const PAGES = ["inicio", "sobre", "projetos", "mcp", "contato", "voce"];
 
 /** "#/projetos/docsage" → { page: "projetos", param: "docsage" }. Plain anchors like "#terminal" stay on the home page. */
 export function parseRoute(hash) {
@@ -201,4 +201,24 @@ export function validateContact({ name, email, message }) {
 export function installSnippet(client, url) {
   if (client === "code") return `claude mcp add --transport http portfolio ${url}`;
   return JSON.stringify({ mcpServers: { portfolio: { command: "npx", args: ["mcp-remote", url] } } }, null, 2);
+}
+
+/** "candidate:1 1 udp 2122260223 192.168.0.12 54321 typ host ..." → "192.168.0.12" (the fifth field). */
+export function candidateAddress(candidate) {
+  const parts = (candidate ?? "").replace(/^a=/, "").split(" ");
+  return parts.length > 7 && parts[6] === "typ" ? parts[4] : null;
+}
+
+// Worst first, as the server sorts the findings.
+export const VERDICTS = { contradicao: "contradição", exposto: "exposto", info: "info", ok: "ok" };
+
+/** One line for the top of the report: the overall reading, from the server's counts. */
+export function scanHeadline({ summary }) {
+  const { contradictions, exposures } = summary;
+  if (contradictions) {
+    return `${contradictions} ${contradictions === 1 ? "contradição" : "contradições"} entre as camadas: algo aqui foi falsificado ou automatizado.`;
+  }
+  if (exposures)
+    return `Nada falsificado, mas ${exposures} ${exposures === 1 ? "coisa exposta" : "coisas expostas"} que dá para esconder.`;
+  return "Nada contraditório e nada exposto que dê para esconder. Raro.";
 }

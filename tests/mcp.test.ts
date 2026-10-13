@@ -6,6 +6,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AskQuestion } from "../src/application/ask-question.js";
 import { BrowsePortfolio } from "../src/application/browse-portfolio.js";
+import { InspectVisitor } from "../src/application/inspect-visitor.js";
 import { ReportStatus } from "../src/application/report-status.js";
 import { SendContact } from "../src/application/send-contact.js";
 import type { Answerer } from "../src/domain/answer.js";
@@ -36,6 +37,7 @@ describe("MCP server at /mcp", () => {
       askQuestion: new AskQuestion(new Bm25Retriever(chunkContent(content)), fakeAnswerer),
       reportStatus: new ReportStatus(metrics, fakeAnswerer.model, new SampledHistory(metrics)),
       sendContact: new SendContact(null),
+      inspectVisitor: new InspectVisitor([], { lookup: async () => null }),
       metrics,
       logger: { info: () => {}, error: () => {} },
       publicDir: path.join(root, "public"),

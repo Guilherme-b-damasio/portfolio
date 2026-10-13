@@ -1,5 +1,5 @@
 import { api } from "../api.js";
-import { el } from "../dom.js";
+import { copyText, el } from "../dom.js";
 import { formatMs, installSnippet } from "../lib.js";
 
 const DEFAULT_ARGS = { get_project: "docsage", ask: "como funciona o docsage?" };
@@ -64,16 +64,6 @@ export function createMcpPage({ root }) {
       ),
     );
     $("#mcp-install").textContent = installSnippet(client, url);
-  }
-
-  async function copy(text, button) {
-    try {
-      await navigator.clipboard.writeText(text);
-      button.textContent = "copiado ✓";
-    } catch {
-      button.textContent = "selecione e copie";
-    }
-    setTimeout(() => (button.textContent = "copiar"), 1600);
   }
 
   function argName(t) {
@@ -175,7 +165,7 @@ export function createMcpPage({ root }) {
         wired = true;
         renderInstall();
         renderServers();
-        $("#mcp-copy").addEventListener("click", (e) => copy($("#mcp-install").textContent, e.currentTarget));
+        $("#mcp-copy").addEventListener("click", (e) => copyText($("#mcp-install").textContent, e.currentTarget));
         $("#mcp-form").addEventListener("submit", call);
         $("#mcp-arg").addEventListener("input", renderRequest);
       }

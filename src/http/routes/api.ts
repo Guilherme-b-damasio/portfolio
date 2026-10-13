@@ -2,18 +2,21 @@ import express from "express";
 import { z } from "zod";
 import type { AskQuestion } from "../../application/ask-question.js";
 import type { BrowsePortfolio } from "../../application/browse-portfolio.js";
+import type { InspectVisitor } from "../../application/inspect-visitor.js";
 import type { ReportStatus } from "../../application/report-status.js";
 import type { SendContact } from "../../application/send-contact.js";
 import type { Logger } from "../../domain/logger.js";
 import { concurrencyCap, ConcurrencyGate } from "../middleware/concurrency.js";
 import { rateLimit, TokenBucket } from "../middleware/rate-limit.js";
 import { contactRouter } from "./contact.js";
+import { scanRouter } from "./scan.js";
 
 export interface ApiDeps {
   browse: BrowsePortfolio;
   askQuestion: AskQuestion;
   reportStatus: ReportStatus;
   sendContact: SendContact;
+  inspectVisitor: InspectVisitor;
   askLimit?: { capacity: number; refillPerMinute: number };
   askConcurrency?: number; // questions answered at once, across every visitor
 }
@@ -37,7 +40,7 @@ export function askGuardsFor(deps: Pick<ApiDeps, "askLimit" | "askConcurrency">)
 }
 
 export function apiRouter(
-  { browse, askQuestion, reportStatus, sendContact }: ApiDeps,
+  { browse, askQuestion, reportStatus, sendContact, inspectVisitor }: ApiDeps,
   logger: Logger,
   { bucket: askBucket, gate: askGate }: AskGuards,
 ) {
@@ -93,6 +96,7 @@ export function apiRouter(
   });
 
   api.use("/contact", contactRouter(sendContact, logger));
+  api.use("/scan", scanRouter(inspectVisitor));
 
   return api;
 }

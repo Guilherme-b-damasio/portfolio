@@ -68,6 +68,22 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
       `claude mcp add` na página
 - [ ] Playground de busca: sliders de `k1`, `b` e top-k, com o ranking se reordenando ao vivo
 - [ ] Laboratório de carga controlada: ≤ 200 requisições, uma corrida por vez no total, fila visível e latência via SSE
+- [x] Raio-X do visitante: `/voce` e `scan` cruzam rede, HTTP e navegador e apontam contradições
+      (UA trocado, fuso falsificado pela metade, GPU impossível para o sistema, automação, WebRTC, navegador
+      defasado). Nada é guardado
+- [ ] Fingerprint TLS (JA4) no raio-X: o UA diz Chrome, o handshake diz Python
+  - [ ] Parser do ClientHello + cálculo do JA4, testado com handshakes reais gerados no teste
+  - [ ] Listener TLS próprio com "tap" do ClientHello e ordem crua dos headers HTTP/1.1
+  - [ ] Fingerprint HTTP/2 (SETTINGS, WINDOW_UPDATE, ordem dos pseudo-headers)
+  - [ ] Manifests em `deploy/` para o subdomínio com passthrough TCP
+  - [ ] **[dono]** IngressRouteTCP com passthrough no Traefik e certificado montado no pod
+- [ ] Teste de vazamento de DNS: servidor DNS autoritativo próprio (UDP, `node:dgram`) para um subdomínio;
+      a página resolve um nome aleatório e mostra qual resolvedor perguntou (provedor x VPN)
+  - [ ] **[dono]** Delegação NS do subdomínio e porta 53/udp exposta no cluster
+- [ ] STUN próprio (RFC 8489 em `node:dgram`): IP público real via WebRTC e tipo de NAT, sem depender do Google
+  - [ ] **[dono]** Porta UDP exposta no cluster
+- [ ] Inteligência de IP: nós de saída do Tor e faixas de datacenter (AWS/GCP/Azure), com refresh limitado
+- [ ] Anonimato agregado: "1 em N visitantes tem sua GPU", com contagens por atributo em memória e sem fingerprint individual
 - [x] Diagrama de arquitetura vivo: SVG em que cada requisição real acende o caminho que percorreu
 
 ## 0.5 Polimento

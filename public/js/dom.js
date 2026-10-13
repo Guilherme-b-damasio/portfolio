@@ -67,3 +67,14 @@ export function icon(name, size = 16) {
   s.append(svg("path", { d: ICONS[name] }));
   return s;
 }
+
+/** Copies text and says so on the button for a moment. */
+export async function copyText(text, button) {
+  try {
+    await navigator.clipboard.writeText(text);
+    button.textContent = "copiado ✓";
+  } catch {
+    button.textContent = "selecione e copie";
+  }
+  setTimeout(() => (button.textContent = "copiar"), 1600);
+}
