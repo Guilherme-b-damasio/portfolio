@@ -71,7 +71,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
   }
   async function loadQuota() {
     try {
-      const { res, body } = await api("/api/ask/quota");
+      const { res, body } = await api("/api/ask/quota", { auto: true });
       if (res.ok) setQuota(body);
     } catch {
       /* the bucket stays hidden; asking still works */

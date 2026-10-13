@@ -8,7 +8,7 @@ export function createLivePanel({ facts, stats, routes, lastRead, footer, onStat
 
   async function refreshHistory() {
     try {
-      const { res, body } = await api("/api/status/history");
+      const { res, body } = await api("/api/status/history", { auto: true });
       if (res.ok) history = body;
     } catch {
       /* sparklines keep the previous series */
@@ -18,7 +18,7 @@ export function createLivePanel({ facts, stats, routes, lastRead, footer, onStat
   async function refresh() {
     let status;
     try {
-      const { res, body } = await api("/api/status");
+      const { res, body } = await api("/api/status", { auto: true });
       if (!res.ok) return;
       status = body;
     } catch {
