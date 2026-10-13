@@ -37,10 +37,22 @@ still start with `TODO` are left out of the index.
 | `GET /api/skills`         | Skill groups with where each one shows up (`content/skills.md`) |
 | `GET /api/contact`        | Whether the contact form is on |
 | `POST /api/contact`       | `{ reason, name, email, message }`, 3 per visitor per hour, 30 a day in total |
+| `GET /api/scan`           | What the bare request gives away (try it with curl); never cached |
+| `POST /api/scan`          | Same, plus the browser probe from `/voce`: findings where the layers contradict each other. 10 per visitor per minute |
 | `GET /api/status`         | Uptime, memory, pod/node, p50/p95 per route, tokens spent today (`llmBudget`) |
 | `GET /api/status/history` | In-process samples every 5 min for the last 24h (reset on restart) |
 | `GET /metrics`            | Prometheus text format, including `portfolio_llm_tokens_used_today` |
 | `GET /healthz`            | Probes                                      |
+
+## Visitor scan (`/voce`)
+
+The page and the terminal's `scan` command cross-examine the visitor's own connection: the
+IP and its reverse DNS, the HTTP headers and Client Hints, and what any script can read
+(GPU, canvas, time zone, platform, WebRTC candidates gathered without a STUN server). Each
+rule is an `ExposureCheck` in `src/application/scan/checks/`; it reports `contradicao` when two
+layers disagree (a spoofed User-Agent, a half-spoofed time zone, automation), `exposto` when
+something could be hidden, `info` or `ok`. The report is computed per request and answered:
+no scan, IP or fingerprint is stored or logged, and the reverse DNS lookup has an 800 ms deadline.
 
 ## MCP
 
