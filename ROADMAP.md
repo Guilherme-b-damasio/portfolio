@@ -26,7 +26,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
       `main.ts`), como no CONTRIBUTING. É só refactor: os testes continuam passando sem mudar de comportamento
 - [x] ESLint (flat config) + Prettier, com `npm run lint` no CI
 - [x] Logs estruturados em JSON, com id por requisição (`x-request-id`) e campos `route`, `status` e `ms`
-- [ ] Headers de segurança e CSP sem `unsafe-inline` em scripts, com teste que confere os headers
+- [x] Headers de segurança e CSP sem `unsafe-inline` em scripts, com teste que confere os headers
 - [ ] Teto de concorrência global no `/api/ask`: acima dele, 503 com `Retry-After`
 - [ ] Orçamento diário de tokens do LLM (`LLM_DAILY_TOKEN_BUDGET`). Ao estourar, o chat cai para
       só-recuperação e o terminal avisa. Com testes
