@@ -2,16 +2,22 @@ import path from "node:path";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { createApp } from "../src/app.js";
-import type { Answerer } from "../src/ask.js";
-import { loadContent, type Content } from "../src/content.js";
-import { Bm25Retriever, chunkContent, tokenize } from "../src/search.js";
+import { AskQuestion } from "../src/application/ask-question.js";
+import { BrowsePortfolio } from "../src/application/browse-portfolio.js";
+import { ReportStatus } from "../src/application/report-status.js";
+import type { Answerer } from "../src/domain/answer.js";
+import type { Content } from "../src/domain/content.js";
+import { createApp } from "../src/http/app.js";
+import { MarkdownContentSource } from "../src/infrastructure/content/markdown-content-source.js";
+import { InMemoryMetrics } from "../src/infrastructure/metrics/in-memory-metrics.js";
+import { Bm25Retriever, tokenize } from "../src/infrastructure/search/bm25-retriever.js";
+import { chunkContent } from "../src/infrastructure/search/chunker.js";
 
 const root = path.resolve(import.meta.dirname, "..");
 let content: Content;
 
 beforeAll(async () => {
-  content = await loadContent(path.join(root, "content"));
+  content = await new MarkdownContentSource(path.join(root, "content")).load();
 });
 
 describe("search", () => {
@@ -54,10 +60,12 @@ describe("http api", () => {
   };
 
   beforeAll(async () => {
+    const metrics = new InMemoryMetrics();
     const app = createApp({
-      content,
-      retriever: new Bm25Retriever(chunkContent(content)),
-      answerer: fakeAnswerer,
+      browse: new BrowsePortfolio(content),
+      askQuestion: new AskQuestion(new Bm25Retriever(chunkContent(content)), fakeAnswerer),
+      reportStatus: new ReportStatus(metrics, fakeAnswerer.model),
+      metrics,
       publicDir: path.join(root, "public"),
       askLimit: { capacity: 3, refillPerMinute: 1 },
     });

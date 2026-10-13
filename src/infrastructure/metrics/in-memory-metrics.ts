@@ -1,5 +1,5 @@
 import os from "node:os";
-import type { RequestHandler } from "express";
+import type { MetricsSnapshot, MetricsStore } from "../../domain/metrics.js";
 
 const WINDOW = 500; // latency samples kept per route
 
@@ -9,22 +9,11 @@ interface RouteStats {
   latencies: number[];
 }
 
-export class Metrics {
+/** Per-process metrics with a sliding latency window per route. One replica, so memory is the source of truth. */
+export class InMemoryMetrics implements MetricsStore {
   private readonly routes = new Map<string, RouteStats>();
   private readonly startedAt = Date.now();
   private readonly recent: number[] = []; // request timestamps of the last minute
-
-  middleware(): RequestHandler {
-    return (req, res, next) => {
-      const start = performance.now();
-      res.on("finish", () => {
-        // Group by the matched route so /api/projects/:slug is one series, not one per slug.
-        const route = `${req.method} ${req.route?.path ? req.baseUrl + req.route.path : req.path.startsWith("/api") ? req.path : "static"}`;
-        this.record(route, performance.now() - start, res.statusCode >= 500);
-      });
-      next();
-    };
-  }
 
   record(route: string, ms: number, isError: boolean) {
     const stats = this.routes.get(route) ?? { count: 0, errors: 0, latencies: [] };
@@ -39,7 +28,7 @@ export class Metrics {
     while (this.recent.length && this.recent[0] < now - 60_000) this.recent.shift();
   }
 
-  snapshot() {
+  snapshot(): MetricsSnapshot {
     const mem = process.memoryUsage();
     return {
       uptimeSeconds: Math.round((Date.now() - this.startedAt) / 1000),
