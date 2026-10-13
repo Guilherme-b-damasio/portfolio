@@ -1,0 +1,363 @@
+import { api } from "./api.js";
+import { el } from "./dom.js";
+import {
+  citationParts,
+  commandForSource,
+  formatMs,
+  formatUptime,
+  guessCommand,
+  highlightParts,
+  parseLine,
+  sections,
+} from "./lib.js";
+
+const COMMANDS = ["help", "whoami", "ls", "cat", "ask", "status", "curl", "clear"];
+const CHIPS = ["whoami", "ls projects", 'ask "como funciona o docsage?"', "status", "curl /api/projects", "help"];
+const isTodo = (text) => /^TODO\b/.test(text.trim());
+
+// ---------- segments: the pieces a terminal line is made of ----------
+const text = (t, cls) => el("span", { class: cls }, t);
+const dim = (t) => text(t, "t-dim");
+const acc = (t) => text(t, "t-acc");
+const warn = (t) => text(t, "t-warn");
+const bold = (t) => text(t, "t-bold");
+
+export function createTerminal({ out, form, input, hint, chips, bucket, projects }) {
+  const history = [];
+  let historyIndex = 0;
+  let quota = null; // { remaining, limit, refillPerMinute, at }
+  let busy = false;
+
+  // ---------- output ----------
+  function line(segments, cls) {
+    return el("div", { class: cls ? `t-line ${cls}` : "t-line" }, segments);
+  }
+  function print(...lines) {
+    out.append(...lines);
+    out.scrollTop = out.scrollHeight;
+  }
+  const say = (...segments) => print(line(segments));
+  const runButton = (label, command, aria, cls = "t-btn") =>
+    el(
+      "button",
+      { type: "button", class: cls, attrs: { "aria-label": aria ?? label }, on: { click: () => run(command) } },
+      label,
+    );
+  const cite = (label, command) =>
+    el(
+      "button",
+      { type: "button", class: "t-cite", title: "abrir o trecho citado", on: { click: () => run(command) } },
+      label,
+    );
+
+  // ---------- the question bucket in the title bar ----------
+  function tokensNow() {
+    if (!quota) return null;
+    const refilled = quota.remaining + ((Date.now() - quota.at) / 60_000) * quota.refillPerMinute;
+    return Math.min(quota.limit, Math.floor(refilled));
+  }
+  function renderBucket() {
+    const tokens = tokensNow();
+    if (tokens == null) return;
+    const cells = Array.from({ length: quota.limit }, (_, i) => el("span", { class: i < tokens ? "on" : "" }));
+    bucket.cells.replaceChildren(...cells);
+    bucket.count.textContent = `${tokens}/${quota.limit}`;
+    bucket.root.setAttribute("aria-label", `${tokens} de ${quota.limit} perguntas disponíveis`);
+    bucket.root.hidden = false;
+  }
+  function setQuota({ remaining, limit, refillPerMinute }) {
+    quota = { remaining, limit, refillPerMinute: refillPerMinute ?? quota?.refillPerMinute ?? 5, at: Date.now() };
+    renderBucket();
+  }
+  async function loadQuota() {
+    try {
+      const { res, body } = await api("/api/ask/quota");
+      if (res.ok) setQuota(body);
+    } catch {
+      /* the bucket stays hidden; asking still works */
+    }
+  }
+  setInterval(renderBucket, 1000);
+
+  // ---------- commands ----------
+  const commands = {
+    help() {
+      const rows = [
+        ["whoami", "quem sou eu"],
+        ["ls projects", "lista os projetos"],
+        ["cat <projeto>", "detalhes de um projeto"],
+        ['ask "<pergunta>"', "pergunta ao RAG sobre mim"],
+        ["status", "métricas ao vivo deste servidor"],
+        ["curl <caminho>", "chama a API crua, ex: curl /api/profile"],
+        ["clear", "limpa a tela"],
+      ];
+      print(...rows.map(([c, d]) => line([acc(c.padEnd(20)), dim(d)])));
+    },
+
+    async whoami() {
+      const { body } = await api("/api/profile");
+      say(bold(body.name), dim(`  ${body.role}${body.location ? " · " + body.location : ""}`));
+      for (const [title, content] of sections(body.body)) {
+        if (isTodo(content)) {
+          print(line([dim(`## ${title}  (texto em escrita)`)], "t-gap"));
+          continue;
+        }
+        print(line([acc(`## ${title}`)], "t-gap"), line([content]));
+      }
+    },
+
+    async ls(args) {
+      if (args[0] && args[0] !== "projects") return say(warn("! "), `ls: ${args[0]}: tente 'ls projects'`);
+      const { body } = await api("/api/projects");
+      projects.set(body.map((p) => p.slug));
+      print(...body.map((p) => line([runButton(p.slug.padEnd(16), `cat ${p.slug}`, `abrir ${p.slug}`), p.summary])));
+    },
+
+    async cat(args) {
+      const slug = (args[0] ?? "").replace(/\.md$/, "");
+      const only = args.slice(1).join(" ");
+      if (!slug) return say(warn("! "), "uso: cat <projeto>");
+      const { res, body } = await api(`/api/projects/${encodeURIComponent(slug)}`);
+      if (res.status === 404) {
+        return print(
+          line([warn("! 404 "), `projeto "${slug}" não encontrado`]),
+          line([dim("rode "), runButton("ls projects", "ls projects")]),
+        );
+      }
+      if (!res.ok) return failed(res.status);
+      say(bold(body.name), dim(`  [${body.stack.join(", ")}]`));
+      const all = sections(body.body);
+      const picked = only ? all.filter(([title]) => title === only) : all;
+      if (only) say(dim("trecho citado · "), runButton("ver tudo", `cat ${body.slug}`, "ver projeto completo"));
+      for (const [title, content] of picked) {
+        if (isTodo(content)) print(line([dim(`## ${title}  (em escrita)`)], "t-gap"));
+        else print(line([acc(`## ${title}`)], "t-gap"), line([content]));
+      }
+      if (body.repo) {
+        print(
+          line(
+            [
+              dim("repo: "),
+              el("a", { href: body.repo, target: "_blank", rel: "noopener", class: "t-link" }, body.repo),
+            ],
+            "t-gap",
+          ),
+        );
+      }
+    },
+
+    async ask(args) {
+      const question = args.join(" ");
+      if (!question) return say(warn("! "), 'uso: ask "sua pergunta"');
+
+      const loading = line([acc("·   "), dim("buscando trechos…")]);
+      print(loading);
+      let frame = 0;
+      const spin = setInterval(() => {
+        frame++;
+        loading.firstChild.textContent = ["·   ", "··  ", "··· "][frame % 3];
+      }, 260);
+
+      let response;
+      try {
+        response = await api("/api/ask", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ question }),
+        });
+      } catch {
+        clearInterval(spin);
+        loading.remove();
+        return failed(0);
+      }
+      clearInterval(spin);
+      const { res, body, ms } = response;
+      const remaining = Number(res.headers.get("x-ratelimit-remaining"));
+      const limit = Number(res.headers.get("x-ratelimit-limit"));
+      if (limit) setQuota({ remaining, limit });
+
+      if (res.status === 429) {
+        loading.remove();
+        const perToken = Math.round(60 / (quota?.refillPerMinute ?? 5));
+        return print(
+          line([warn("! 429 "), body.error]),
+          line([
+            dim("fichas  "),
+            acc("■".repeat(remaining) + "□".repeat(Math.max(0, limit - remaining))),
+            dim(`  · ${limit} por visitante, +1 a cada ${perToken}s`),
+          ]),
+        );
+      }
+      if (!res.ok) {
+        loading.remove();
+        return res.status >= 500 ? failed(res.status) : say(warn("! "), body.error ?? `erro ${res.status}`);
+      }
+
+      if (!body.passages.length) {
+        loading.replaceWith(line([warn("! "), "Nada no meu conteúdo bate com essa pergunta."]));
+        return say(
+          dim("tente "),
+          runButton('ask "o que é o docsage?"', 'ask "o que é o docsage?"', "rodar sugestão"),
+          dim(" ou "),
+          runButton("ls projects", "ls projects"),
+        );
+      }
+
+      if (body.answer) {
+        const parts = citationParts(body.answer).map((p) =>
+          p.source ? cite(p.text, commandForSource(p.source)) : p.text,
+        );
+        loading.replaceWith(line(parts, "t-answer"));
+      } else {
+        loading.replaceWith(line([dim("(LLM desligado neste ambiente: mostrando só a recuperação)")]));
+      }
+
+      for (const hit of body.passages) {
+        const excerpt = highlightParts(hit.chunk.text.slice(0, 280), hit.matchedTerms).map((p) =>
+          p.mark ? el("mark", {}, p.text) : p.text,
+        );
+        print(
+          line(
+            [
+              dim(`${hit.score.toFixed(2)}  `),
+              cite(hit.chunk.source, commandForSource(hit.chunk.source)),
+              "\n",
+              excerpt,
+            ],
+            "t-hit",
+          ),
+        );
+      }
+
+      const { retrieval, generation } = body.latencyMs;
+      const parts = [`bm25 ${formatMs(retrieval)}`];
+      if (generation != null) {
+        parts.push(
+          `${body.model} ${formatMs(generation)}`,
+          `${body.usage.inputTokens}→${body.usage.outputTokens} tokens`,
+        );
+      }
+      parts.push(`total ${formatMs(ms)}`, `rate limit restante ${remaining}`);
+      print(line([dim(parts.join(" · "))], "t-meta"));
+    },
+
+    async status() {
+      const { res, body } = await api("/api/status");
+      if (!res.ok) return failed(res.status);
+      const rows = [
+        ["pod", `${body.runtime.pod}${body.runtime.node_name ? " @ " + body.runtime.node_name : ""}`],
+        ["uptime", formatUptime(body.uptimeSeconds)],
+        ["memória", `${body.memory.rssMb} MB rss`],
+        ["req/min", String(body.requestsLastMinute)],
+        ["llm", body.llm ?? "desligado"],
+        ["commit", body.build.commit.slice(0, 7)],
+      ];
+      print(...rows.map(([k, v]) => line([dim(k.padEnd(11)), v])));
+    },
+
+    async curl(args) {
+      const path = args.find((a) => a.startsWith("/"));
+      if (!path) return say(warn("! "), "uso: curl /api/...");
+      const { res, body, ms, type } = await api(path);
+      const head = `HTTP ${res.status} · ${formatMs(ms)} · ${type}`;
+      say(res.ok ? dim(head) : warn(head));
+      say(typeof body === "string" ? body.slice(0, 2000) : JSON.stringify(body, null, 2).slice(0, 4000));
+    },
+
+    clear() {
+      out.replaceChildren();
+    },
+  };
+
+  function failed(status) {
+    print(
+      line([warn(status ? `! erro ${status} ` : "! sem resposta "), "A API não respondeu."]),
+      line([
+        dim("O pod pode estar reiniciando. Rode "),
+        runButton("status", "status"),
+        dim(" ou tente de novo em alguns segundos."),
+      ]),
+    );
+  }
+
+  async function run(raw) {
+    const trimmed = (raw ?? "").trim();
+    if (!trimmed || busy) return;
+    history.push(trimmed);
+    historyIndex = history.length;
+    say(acc("$ "), trimmed);
+
+    const [name, ...args] = parseLine(trimmed);
+    const command = commands[name.toLowerCase()];
+    if (!command) {
+      const guess = guessCommand(name.toLowerCase(), COMMANDS);
+      say(warn("! "), `${name}: comando não encontrado. Digite 'help'.`);
+      if (guess) say(dim("você quis dizer "), runButton(guess, guess), dim("?"));
+      return;
+    }
+    busy = true;
+    try {
+      await command(args);
+    } catch {
+      failed(0);
+    } finally {
+      busy = false;
+    }
+  }
+
+  // ---------- input ----------
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const value = input.value;
+    input.value = "";
+    run(value);
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowUp" && historyIndex > 0) {
+      input.value = history[--historyIndex];
+    } else if (e.key === "ArrowDown" && history.length) {
+      historyIndex = Math.min(historyIndex + 1, history.length);
+      input.value = history[historyIndex] ?? "";
+    } else if (e.key === "Tab" && input.value.trim()) {
+      const words = input.value.split(" ");
+      const pool =
+        words.length === 1 ? COMMANDS : words[0] === "cat" ? projects.get() : words[0] === "ls" ? ["projects"] : [];
+      const matches = pool.filter((c) => c.startsWith(words[words.length - 1]));
+      if (!matches.length) return;
+      if (matches.length === 1) {
+        words[words.length - 1] = matches[0];
+        input.value = words.join(" ") + " ";
+      } else {
+        say(dim(matches.join("   ")));
+      }
+    } else {
+      return;
+    }
+    e.preventDefault();
+  });
+
+  chips.replaceChildren(
+    ...CHIPS.map((c) =>
+      el(
+        "button",
+        { type: "button", class: "chip", on: { click: () => run(c) } },
+        el("span", { attrs: { "aria-hidden": "true" } }, "›"),
+        c,
+      ),
+    ),
+  );
+
+  // Phones get a shorter placeholder and just the ↵ hint: tapping a chip beats typing there.
+  const narrow = matchMedia("(max-width: 559px)");
+  const fit = () => {
+    input.placeholder = narrow.matches ? "toque numa sugestão ou digite" : 'ask "que projetos de IA você tem?"';
+    hint.textContent = narrow.matches ? "↵" : "tab ↹  ↑↓  ↵";
+  };
+  narrow.addEventListener("change", fit);
+  fit();
+
+  say(dim("Bem-vindo. Isto aqui fala com a API de verdade. Digite 'help' ou toque numa sugestão."));
+  loadQuota();
+  return { run };
+}
