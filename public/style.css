@@ -1004,6 +1004,152 @@ a:hover {
   color: var(--color-muted);
 }
 
+/* ---------- my requests: top-bar button and floating panel ---------- */
+.req-btn {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  cursor: pointer;
+}
+.req-btn:hover,
+.req-btn[aria-expanded="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent-text);
+}
+.req-badge {
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-bg);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.req-panel {
+  position: fixed;
+  /* left + right + max-width instead of a vw width: 100vw counts the scrollbar and pushed the panel off the edge. */
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  z-index: 10;
+  max-width: 420px;
+  margin-left: auto;
+  max-height: min(60vh, 520px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: var(--term-frame);
+  border-color: var(--color-divider);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+.req-panel[hidden] {
+  display: none;
+}
+.req-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.req-head h2 {
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.req-close {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-md);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+.req-close:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-text);
+}
+.req-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.req-toggle input {
+  accent-color: var(--color-accent);
+}
+.req-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+.req-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 6ch 7ch;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+.req-list li > span:nth-last-child(-n + 2) {
+  text-align: right;
+}
+.req-list li.auto {
+  color: var(--color-muted);
+}
+.req-list li.bad {
+  color: var(--color-accent-text);
+}
+.req-list li.req-empty {
+  display: block;
+  color: var(--color-muted);
+  border-bottom: 0;
+}
+.req-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.req-path b {
+  font-weight: 600;
+}
+.req-note {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+@media (max-width: 559px) {
+  .req-btn-label,
+  .req-list li > span:first-child {
+    display: none;
+  }
+  .req-list li {
+    grid-template-columns: minmax(0, 1fr) 6ch 7ch;
+  }
+}
+
 /* ---------- breakpoints, the same as the design: 560, 760 and 960px ---------- */
 .diagram.narrow {
   display: none;

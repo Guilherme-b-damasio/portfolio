@@ -2,6 +2,7 @@ import { api } from "./js/api.js";
 import { createDiagram } from "./js/diagram.js";
 import { el, icon } from "./js/dom.js";
 import { createLivePanel } from "./js/live.js";
+import { createRequestsPanel } from "./js/requests-panel.js";
 import { createTerminal } from "./js/terminal.js";
 
 const $ = (id) => document.getElementById(id);
@@ -52,7 +53,7 @@ function openInTerminal(command) {
 const LINK_LABELS = { github: "GitHub", linkedin: "LinkedIn", email: "E-mail" };
 
 async function renderProfile() {
-  const { body } = await api("/api/profile");
+  const { body } = await api("/api/profile", { auto: true });
   $("hero-name").textContent = body.name;
   $("role").textContent = body.role;
   document.title = `${body.name} · ${body.role}`;
@@ -70,7 +71,7 @@ async function renderProfile() {
 }
 
 async function renderProjects() {
-  const { body } = await api("/api/projects");
+  const { body } = await api("/api/projects", { auto: true });
   slugs = body.map((p) => p.slug);
   $("projects").replaceChildren(
     ...body.map((p, i) => {
@@ -122,6 +123,16 @@ async function renderProjects() {
     }),
   );
 }
+
+// ---------- my requests ----------
+createRequestsPanel({
+  button: $("my-requests-btn"),
+  count: $("my-requests-count"),
+  panel: $("my-requests"),
+  list: $("my-requests-list"),
+  close: $("my-requests-close"),
+  showAuto: $("my-requests-auto"),
+});
 
 // ---------- live panel and diagram ----------
 const diagram = createDiagram({ wide: $("diagram-wide"), narrow: $("diagram-narrow"), log: $("request-log") });
