@@ -29,7 +29,7 @@ export function createApp({ metrics, logger, publicDir, ...apiDeps }: AppDeps) {
     res.type("text/plain; version=0.0.4").send(apiDeps.reportStatus.prometheus());
   });
 
-  app.use("/api", apiRouter(apiDeps));
+  app.use("/api", apiRouter(apiDeps, logger));
   app.use(express.static(publicDir, { extensions: ["html"] }));
   app.use((_req, res) => {
     res.status(404).sendFile(path.join(publicDir, "index.html"));
