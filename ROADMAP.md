@@ -27,7 +27,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 - [x] ESLint (flat config) + Prettier, com `npm run lint` no CI
 - [x] Logs estruturados em JSON, com id por requisição (`x-request-id`) e campos `route`, `status` e `ms`
 - [x] Headers de segurança e CSP sem `unsafe-inline` em scripts, com teste que confere os headers
-- [ ] Teto de concorrência global no `/api/ask`: acima dele, 503 com `Retry-After`
+- [x] Teto de concorrência global no `/api/ask`: acima dele, 503 com `Retry-After`
 - [ ] Orçamento diário de tokens do LLM (`LLM_DAILY_TOKEN_BUDGET`). Ao estourar, o chat cai para
       só-recuperação e o terminal avisa. Com testes
 - [x] Workflow que constrói a imagem e publica em `ghcr.io/guilherme-b-damasio/portfolio:<YYYYMMDDHHmmss>-<sha>`

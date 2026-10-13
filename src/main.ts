@@ -40,6 +40,7 @@ const app = createApp({
   metrics,
   logger,
   publicDir: path.join(root, "public"),
+  askConcurrency: Number(process.env.ASK_MAX_CONCURRENCY ?? 4),
 });
 
 const server = app.listen(port, () => {

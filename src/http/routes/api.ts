@@ -5,6 +5,7 @@ import type { BrowsePortfolio } from "../../application/browse-portfolio.js";
 import type { ReportStatus } from "../../application/report-status.js";
 import type { SendContact } from "../../application/send-contact.js";
 import type { Logger } from "../../domain/logger.js";
+import { concurrencyCap, ConcurrencyGate } from "../middleware/concurrency.js";
 import { rateLimit, TokenBucket } from "../middleware/rate-limit.js";
 import { contactRouter } from "./contact.js";
 
@@ -14,6 +15,7 @@ export interface ApiDeps {
   reportStatus: ReportStatus;
   sendContact: SendContact;
   askLimit?: { capacity: number; refillPerMinute: number };
+  askConcurrency?: number; // questions answered at once, across every visitor
 }
 
 const askBody = z.object({ question: z.string().trim().min(2).max(500) });
@@ -24,10 +26,20 @@ export function askBucketFor({ askLimit }: Pick<ApiDeps, "askLimit">): TokenBuck
   return new TokenBucket(capacity, refillPerMinute);
 }
 
+/** Both limits on asking, shared by every door that reaches the RAG (HTTP and MCP). */
+export interface AskGuards {
+  bucket: TokenBucket;
+  gate: ConcurrencyGate;
+}
+
+export function askGuardsFor(deps: Pick<ApiDeps, "askLimit" | "askConcurrency">): AskGuards {
+  return { bucket: askBucketFor(deps), gate: new ConcurrencyGate(deps.askConcurrency ?? 4) };
+}
+
 export function apiRouter(
   { browse, askQuestion, reportStatus, sendContact }: ApiDeps,
   logger: Logger,
-  askBucket: TokenBucket,
+  { bucket: askBucket, gate: askGate }: AskGuards,
 ) {
   const api = express.Router();
 
@@ -58,7 +70,8 @@ export function apiRouter(
     res.json(askBucket.peek(req.ip ?? "unknown"));
   });
 
-  api.post("/ask", rateLimit(askBucket), async (req, res, next) => {
+  // The gate runs first, so a visitor turned away because the server is busy keeps their token.
+  api.post("/ask", concurrencyCap(askGate), rateLimit(askBucket), async (req, res, next) => {
     const parsed = askBody.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Envie { question: string } com 2 a 500 caracteres." });
