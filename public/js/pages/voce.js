@@ -1,5 +1,6 @@
 import { api } from "../api.js";
 import { copyText, el } from "../dom.js";
+import { createHexDump } from "../hexdump.js";
 import { scanHeadline, VERDICTS } from "../lib.js";
 import { collectProbe } from "../probe.js";
 
@@ -35,6 +36,10 @@ export function createVocePage({ root }) {
   const $ = (sel) => root.querySelector(sel);
   let scanned = false;
   let running = false;
+  let samples = null; // real handshakes from known clients, loaded once
+  let own = null; // the visitor's own handshake, when the connection reached our TLS listener
+  let shown = null;
+  const hexDump = createHexDump($("#handshake"));
 
   async function scan() {
     if (running) return;
@@ -56,6 +61,8 @@ export function createVocePage({ root }) {
         return;
       }
       render(body);
+      own = body.tls;
+      await renderHandshakes();
     } catch {
       $("#scan-summary").replaceChildren(el("p", {}, "Não consegui falar com o servidor."));
     } finally {
@@ -114,6 +121,44 @@ export function createVocePage({ root }) {
     );
   }
 
+  async function renderHandshakes() {
+    samples ??= await api("/api/scan/tls-samples", { auto: true })
+      .then(({ body }) => body)
+      .catch(() => []);
+    const options = [
+      ...(own
+        ? [{ id: "seu", label: "o seu", client: "o handshake que o seu navegador acabou de mandar", ...own }]
+        : []),
+      ...samples,
+    ];
+    if (!options.length) return;
+    if (!options.some((o) => o.id === shown)) shown = options[0].id;
+    $("#handshake-tabs").replaceChildren(
+      ...options.map((o) =>
+        el(
+          "button",
+          {
+            type: "button",
+            role: "tab",
+            attrs: { "aria-selected": String(o.id === shown) },
+            on: {
+              click: () => {
+                shown = o.id;
+                renderHandshakes();
+              },
+            },
+          },
+          o.label,
+        ),
+      ),
+    );
+    const current = options.find((o) => o.id === shown);
+    $("#handshake-client").textContent = own
+      ? `Capturado de: ${current.client}.`
+      : `${location.protocol === "https:" ? "Aqui o TLS termina no proxy, então o seu handshake não chega até o código." : "Esta página veio sem HTTPS, então não houve handshake."} Estes são handshakes reais, capturados de: ${current.client}.`;
+    hexDump.show(current);
+  }
+
   function findingItem(f) {
     return el(
       "li",
@@ -133,7 +178,7 @@ export function createVocePage({ root }) {
 
   function emptyLayer(id, probe) {
     if (id === "tls") {
-      return "Ainda não: aqui o TLS termina no proxy, então o handshake chega reescrito. A próxima etapa lê o ClientHello cru e calcula a impressão JA4.";
+      return "O TLS desta conexão termina no proxy, então o seu handshake chega reescrito. Abaixo, handshakes reais de outros clientes, byte a byte.";
     }
     if (id === "navegador" && !probe) return "Sonda desligada: só o que o servidor vê.";
     return "Nada nesta camada.";
