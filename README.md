@@ -19,6 +19,7 @@ still start with `TODO` are left out of the index.
 | `PORT`              | `3000`            |                                                      |
 | `ANTHROPIC_API_KEY` | unset             | Enables generated answers; without it `/api/ask` returns only the retrieved passages |
 | `CLAUDE_MODEL`      | `claude-opus-5-5` | Model used by `/api/ask`                             |
+| `ASK_MAX_CONCURRENCY` | `4`             | Questions answered at once across every visitor (HTTP and MCP); above it, 503 with `Retry-After` |
 | `GIT_SHA`, `BUILT_AT` | `dev`           | Shown in the footer and `/api/status` (set as Docker build args) |
 | `RESEND_API_KEY`, `CONTACT_TO` | unset | Turn on the contact form; messages go to `CONTACT_TO` through Resend |
 | `CONTACT_FROM`      | `onboarding@resend.dev` | Sender shown in the e-mail (needs a verified domain on Resend to change) |
@@ -30,7 +31,7 @@ still start with `TODO` are left out of the index.
 | `GET /api/profile`        |                                             |
 | `GET /api/projects?tag=`  | Without bodies                              |
 | `GET /api/projects/:slug` |                                             |
-| `POST /api/ask`           | `{ question }`, 5 per client, refills 5/min |
+| `POST /api/ask`           | `{ question }`, 5 per client, refills 5/min; 503 + `Retry-After` when `ASK_MAX_CONCURRENCY` are already running |
 | `GET /api/ask/quota`      | The caller's remaining questions, without spending one |
 | `GET /api/skills`         | Skill groups with where each one shows up (`content/skills.md`) |
 | `GET /api/contact`        | Whether the contact form is on |
@@ -44,7 +45,7 @@ still start with `TODO` are left out of the index.
 
 `/mcp` is a public, read-only MCP server (Streamable HTTP, stateless) with the same data as
 the terminal: `list_projects`, `get_project`, `ask` and `get_status`. `ask` spends the same
-per-visitor question bucket as `POST /api/ask`, and every call is capped at 60 a minute.
+per-visitor question bucket and the global concurrency cap as `POST /api/ask`, and every call is capped at 60 a minute.
 
 ```bash
 claude mcp add --transport http portfolio https://<host>/mcp
