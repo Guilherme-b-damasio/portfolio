@@ -222,6 +222,13 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
           p.source ? cite(p.text, commandForSource(p.source)) : p.text,
         );
         loading.replaceWith(line(parts, "t-answer"));
+      } else if (body.degraded === "token-budget") {
+        loading.replaceWith(
+          line([
+            warn("! "),
+            "O orçamento diário de tokens do LLM acabou. Até 00:00 UTC mostro só os trechos recuperados.",
+          ]),
+        );
       } else {
         loading.replaceWith(line([dim("(LLM desligado neste ambiente: mostrando só a recuperação)")]));
       }
@@ -264,6 +271,14 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ["memória", `${body.memory.rssMb} MB rss`],
         ["req/min", String(body.requestsLastMinute)],
         ["llm", body.llm ?? "desligado"],
+        ...(body.llmBudget
+          ? [
+              [
+                "tokens/dia",
+                `${body.llmBudget.used.toLocaleString("pt-BR")} de ${body.llmBudget.limit.toLocaleString("pt-BR")}`,
+              ],
+            ]
+          : []),
         ["commit", body.build.commit.slice(0, 7)],
       ];
       print(...rows.map(([k, v]) => line([dim(k.padEnd(11)), v])));
