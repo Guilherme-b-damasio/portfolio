@@ -22,7 +22,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 
 ## 0.1 Fundação
 
-- [ ] Reorganizar `src/` em camadas (`domain/`, `application/`, `infrastructure/`, `http/`,
+- [x] Reorganizar `src/` em camadas (`domain/`, `application/`, `infrastructure/`, `http/`,
       `main.ts`), como no CONTRIBUTING. É só refactor: os testes continuam passando sem mudar de comportamento
 - [ ] ESLint (flat config) + Prettier, com `npm run lint` no CI
 - [ ] Logs estruturados em JSON, com id por requisição (`x-request-id`) e campos `route`, `status` e `ms`
