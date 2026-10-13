@@ -20,6 +20,8 @@ still start with `TODO` are left out of the index.
 | `ANTHROPIC_API_KEY` | unset             | Enables generated answers; without it `/api/ask` returns only the retrieved passages |
 | `CLAUDE_MODEL`      | `claude-opus-5-5` | Model used by `/api/ask`                             |
 | `GIT_SHA`, `BUILT_AT` | `dev`           | Shown in the footer and `/api/status` (set as Docker build args) |
+| `RESEND_API_KEY`, `CONTACT_TO` | unset | Turn on the contact form; messages go to `CONTACT_TO` through Resend |
+| `CONTACT_FROM`      | `onboarding@resend.dev` | Sender shown in the e-mail (needs a verified domain on Resend to change) |
 
 ## API
 
@@ -30,6 +32,9 @@ still start with `TODO` are left out of the index.
 | `GET /api/projects/:slug` |                                             |
 | `POST /api/ask`           | `{ question }`, 5 per client, refills 5/min |
 | `GET /api/ask/quota`      | The caller's remaining questions, without spending one |
+| `GET /api/skills`         | Skill groups with where each one shows up (`content/skills.md`) |
+| `GET /api/contact`        | Whether the contact form is on |
+| `POST /api/contact`       | `{ reason, name, email, message }`, 3 per visitor per hour, 30 a day in total |
 | `GET /api/status`         | Uptime, memory, pod/node, p50/p95 per route |
 | `GET /api/status/history` | In-process samples every 5 min for the last 24h (reset on restart) |
 | `GET /metrics`            | Prometheus text format                      |
