@@ -56,7 +56,11 @@ describe("http api", () => {
   let base: string;
   const fakeAnswerer: Answerer = {
     model: "fake-model",
-    answer: async (_q, passages) => ({ text: `resposta [${passages[0].chunk.source}]`, inputTokens: 10, outputTokens: 5 }),
+    answer: async (_q, passages) => ({
+      text: `resposta [${passages[0].chunk.source}]`,
+      inputTokens: 10,
+      outputTokens: 5,
+    }),
   };
 
   beforeAll(async () => {
@@ -76,7 +80,11 @@ describe("http api", () => {
   afterAll(() => server.close());
 
   const ask = (question: unknown) =>
-    fetch(`${base}/api/ask`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question }) });
+    fetch(`${base}/api/ask`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ question }),
+    });
 
   it("lists projects without their bodies and filters by tag", async () => {
     const all = await (await fetch(`${base}/api/projects`)).json();

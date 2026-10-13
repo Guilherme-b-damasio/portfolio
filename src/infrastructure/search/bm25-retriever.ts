@@ -23,7 +23,11 @@ export class Bm25Retriever implements Retriever {
   private readonly df = new Map<string, number>();
   private readonly avgLength: number;
 
-  constructor(chunks: Chunk[], private readonly k1 = 1.5, private readonly b = 0.75) {
+  constructor(
+    chunks: Chunk[],
+    private readonly k1 = 1.5,
+    private readonly b = 0.75,
+  ) {
     this.docs = chunks.map((chunk) => {
       // Index the source without ".md" so "docsage" matches every section of docsage.md.
       const tokens = tokenize(`${chunk.source.replace(/\.md\b/g, "")} ${chunk.text}`);

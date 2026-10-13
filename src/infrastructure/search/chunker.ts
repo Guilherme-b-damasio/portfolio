@@ -20,7 +20,8 @@ export function chunkContent(content: Content): Chunk[] {
       const [title, ...rest] = section.split("\n");
       const text = rest.join("\n").trim();
       // Sections still marked TODO are placeholders; indexing them would only add noise.
-      if (text && !/^TODO\b/.test(text)) chunks.push({ id: `${doc.file}#${i + 1}`, source: `${doc.file} › ${title.trim()}`, text });
+      if (text && !/^TODO\b/.test(text))
+        chunks.push({ id: `${doc.file}#${i + 1}`, source: `${doc.file} › ${title.trim()}`, text });
     });
   }
   return chunks;

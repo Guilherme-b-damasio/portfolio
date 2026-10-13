@@ -11,6 +11,8 @@
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
     "inspect": "npx @modelcontextprotocol/inspector"
   },
   "engines": {
@@ -23,10 +25,16 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/express": "^5.0.6",
     "@types/node": "^20.19.0",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.10",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",
+    "typescript-eslint": "^8.71.2",
     "vitest": "^4.0.0"
   }
 }

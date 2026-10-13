@@ -25,8 +25,9 @@ docs: document the deploy flow
 ci: publish the image to GHCR
 ```
 
-Keep each commit small and focused. `npm run typecheck` and `npm test` must pass before
-every commit.
+Keep each commit small and focused. `npm run typecheck`, `npm run lint` and `npm test` must
+pass before every commit. `npm run format` fixes formatting; the dependency rule between layers
+is enforced by `tests/architecture.test.ts`.
 
 ## Architecture
 

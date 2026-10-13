@@ -60,7 +60,9 @@ export class InMemoryMetrics implements MetricsStore {
       "# TYPE portfolio_errors_total counter",
       ...[...this.routes].map(([r, s]) => `portfolio_errors_total{route="${r}"} ${s.errors}`),
       "# TYPE portfolio_latency_p95_ms gauge",
-      ...[...this.routes].map(([r, s]) => `portfolio_latency_p95_ms{route="${r}"} ${round(percentile(s.latencies, 0.95))}`),
+      ...[...this.routes].map(
+        ([r, s]) => `portfolio_latency_p95_ms{route="${r}"} ${round(percentile(s.latencies, 0.95))}`,
+      ),
       "# TYPE process_resident_memory_bytes gauge",
       `process_resident_memory_bytes ${process.memoryUsage().rss}`,
     ];
