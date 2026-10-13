@@ -125,6 +125,13 @@ describe("http api", () => {
     expect((await ask("x".repeat(501))).status).toBe(400);
   });
 
+  it("reports the visitor's quota without spending it", async () => {
+    const quota = async () => (await fetch(`${base}/api/ask/quota`)).json();
+    const before = await quota();
+    expect(before).toMatchObject({ limit: 3, refillPerMinute: 1 });
+    expect((await quota()).remaining).toBe(before.remaining);
+  });
+
   it("rate limits /api/ask per client", async () => {
     const statuses = [];
     for (let i = 0; i < 4; i++) statuses.push((await ask("docsage?")).status);
