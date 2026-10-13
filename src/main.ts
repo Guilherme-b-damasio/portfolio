@@ -2,6 +2,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { AskQuestion } from "./application/ask-question.js";
 import { BrowsePortfolio } from "./application/browse-portfolio.js";
+import { InspectVisitor } from "./application/inspect-visitor.js";
+import { scanChecks } from "./application/scan/checks/index.js";
 import { ReportStatus } from "./application/report-status.js";
 import { SendContact } from "./application/send-contact.js";
 import { createApp } from "./http/app.js";
@@ -11,6 +13,7 @@ import { ClaudeAnswerer } from "./infrastructure/llm/claude-answerer.js";
 import { DailyTokenBudget } from "./infrastructure/llm/daily-token-budget.js";
 import { ResendMailer } from "./infrastructure/mail/resend-mailer.js";
 import { InMemoryMetrics } from "./infrastructure/metrics/in-memory-metrics.js";
+import { DnsReverseLookup } from "./infrastructure/net/dns-reverse-lookup.js";
 import { SampledHistory } from "./infrastructure/metrics/sampled-history.js";
 import { Bm25Retriever } from "./infrastructure/search/bm25-retriever.js";
 import { chunkContent } from "./infrastructure/search/chunker.js";
@@ -40,6 +43,7 @@ const app = createApp({
   askQuestion: new AskQuestion(retriever, answerer, { budget }),
   reportStatus: new ReportStatus(metrics, answerer?.model ?? null, history, budget),
   sendContact: new SendContact(mailer),
+  inspectVisitor: new InspectVisitor(scanChecks(), new DnsReverseLookup()),
   metrics,
   logger,
   publicDir: path.join(root, "public"),

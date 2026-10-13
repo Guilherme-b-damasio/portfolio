@@ -4,6 +4,7 @@ import type { Server } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AskQuestion } from "../src/application/ask-question.js";
 import { BrowsePortfolio } from "../src/application/browse-portfolio.js";
+import { InspectVisitor } from "../src/application/inspect-visitor.js";
 import { ReportStatus } from "../src/application/report-status.js";
 import { SendContact } from "../src/application/send-contact.js";
 import type { Answerer } from "../src/domain/answer.js";
@@ -82,6 +83,7 @@ describe("http api", () => {
       askQuestion: new AskQuestion(new Bm25Retriever(chunkContent(content)), fakeAnswerer),
       reportStatus: new ReportStatus(metrics, fakeAnswerer.model, history),
       sendContact: new SendContact(null),
+      inspectVisitor: new InspectVisitor([], { lookup: async () => null }),
       metrics,
       logger,
       publicDir: path.join(root, "public"),
