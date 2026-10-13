@@ -19,6 +19,7 @@ still start with `TODO` are left out of the index.
 | `PORT`              | `3000`            |                                                      |
 | `ANTHROPIC_API_KEY` | unset             | Enables generated answers; without it `/api/ask` returns only the retrieved passages |
 | `CLAUDE_MODEL`      | `claude-opus-5-5` | Model used by `/api/ask`                             |
+| `LLM_DAILY_TOKEN_BUDGET` | `200000`    | LLM tokens (input + output) per UTC day; past it `/api/ask` returns only the passages, with `degraded: "token-budget"`, until 00:00 UTC |
 | `ASK_MAX_CONCURRENCY` | `4`             | Questions answered at once across every visitor (HTTP and MCP); above it, 503 with `Retry-After` |
 | `GIT_SHA`, `BUILT_AT` | `dev`           | Shown in the footer and `/api/status` (set as Docker build args) |
 | `RESEND_API_KEY`, `CONTACT_TO` | unset | Turn on the contact form; messages go to `CONTACT_TO` through Resend |
@@ -36,9 +37,9 @@ still start with `TODO` are left out of the index.
 | `GET /api/skills`         | Skill groups with where each one shows up (`content/skills.md`) |
 | `GET /api/contact`        | Whether the contact form is on |
 | `POST /api/contact`       | `{ reason, name, email, message }`, 3 per visitor per hour, 30 a day in total |
-| `GET /api/status`         | Uptime, memory, pod/node, p50/p95 per route |
+| `GET /api/status`         | Uptime, memory, pod/node, p50/p95 per route, tokens spent today (`llmBudget`) |
 | `GET /api/status/history` | In-process samples every 5 min for the last 24h (reset on restart) |
-| `GET /metrics`            | Prometheus text format                      |
+| `GET /metrics`            | Prometheus text format, including `portfolio_llm_tokens_used_today` |
 | `GET /healthz`            | Probes                                      |
 
 ## MCP

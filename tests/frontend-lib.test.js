@@ -33,6 +33,7 @@ describe("front-end helpers", () => {
     expect(edgesFor({ route: "POST /api/ask", status: 200, generated: true })).toContain("bc");
     expect(edgesFor({ route: "POST /api/ask", status: 200, generated: false })).not.toContain("bc");
     expect(edgesFor({ route: "POST /api/ask", status: 429 })).toEqual(["vi", "ia", "ar"]);
+    expect(edgesFor({ route: "POST /api/ask", status: 503 })).toEqual(["vi", "ia", "ar"]);
     expect(edgesFor({ route: "GET /api/status", status: 200 })).toEqual(["vi", "ia", "ax"]);
     expect(edgesFor({ route: "GET /api/projects/:slug", status: 404 })).toEqual(["vi", "ia"]);
   });

@@ -18,4 +18,5 @@ export interface AskResult {
   model: string | null;
   usage: { inputTokens: number; outputTokens: number } | null;
   latencyMs: { retrieval: number; generation: number | null };
+  degraded: "token-budget" | null; // why an LLM that is on did not answer, so the terminal can say it
 }
