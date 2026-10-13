@@ -96,7 +96,7 @@ export class TlsStrengthCheck implements ExposureCheck {
             verdict: "ok",
             title: `Sua conexão já usa criptografia pós-quântica (${POST_QUANTUM[pq[0]]})`,
             detail:
-              "A troca de chaves mistura curva elíptica com ML-KEM. Quem gravar este tráfego hoje não consegue decifrá-lo nem com um computador quântico no futuro.",
+              "A troca de chaves mistura curva elíptica com ML-KEM. Quem gravar este tráfego hoje não consegue decifrá-lo nem com um computador quântico no futuro. É por isso que o handshake passa de 1,7 KB: só a chave ML-KEM ocupa 1.216 bytes.",
             evidence: [`key_share: ${hello.keyShareGroups.filter((g) => !isGrease(g)).join(", ")}`],
           }
         : {
