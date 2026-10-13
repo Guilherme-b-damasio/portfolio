@@ -84,3 +84,58 @@ describe("front-end helpers", () => {
     expect(commandForSource("profile.md › Stack")).toBe("whoami");
   });
 });
+
+describe("front-end helpers for the v2 pages", () => {
+  it("routes hashes to pages and keeps plain anchors on the home page", async () => {
+    const { parseRoute } = await import("../public/js/lib.js");
+    expect(parseRoute("#/projetos/docsage")).toEqual({ page: "projetos", param: "docsage", anchor: null });
+    expect(parseRoute("#/sobre")).toEqual({ page: "sobre", param: null, anchor: null });
+    expect(parseRoute("#ao-vivo")).toEqual({ page: "inicio", param: null, anchor: "ao-vivo" });
+    expect(parseRoute("#/nada")).toEqual({ page: "inicio", param: null, anchor: null });
+    expect(parseRoute("")).toEqual({ page: "inicio", param: null, anchor: null });
+  });
+
+  it("turns the content's Markdown into blocks", async () => {
+    const { markdownBlocks } = await import("../public/js/lib.js");
+    const md = "### Cargo · Empresa\n\n- Fiz **isso**.\n- E aquilo.\n\nUm parágrafo\nem duas linhas.\n\nTODO: escrever";
+    expect(markdownBlocks(md)).toEqual([
+      { type: "h3", text: "Cargo · Empresa" },
+      {
+        type: "li",
+        parts: [
+          { text: "Fiz ", bold: false },
+          { text: "isso", bold: true },
+          { text: ".", bold: false },
+        ],
+      },
+      { type: "li", parts: [{ text: "E aquilo.", bold: false }] },
+      { type: "p", parts: [{ text: "Um parágrafo em duas linhas.", bold: false }] },
+      { type: "todo", text: "TODO: escrever" },
+    ]);
+  });
+
+  it("validates the contact form like the server", async () => {
+    const { validateContact } = await import("../public/js/lib.js");
+    expect(validateContact({ name: "Ana", email: "ana@x.com", message: "x".repeat(20) })).toEqual({});
+    expect(Object.keys(validateContact({ name: "", email: "nope", message: "curta" })).sort()).toEqual([
+      "email",
+      "message",
+      "name",
+    ]);
+  });
+
+  it("builds the install snippet per client", async () => {
+    const { installSnippet } = await import("../public/js/lib.js");
+    expect(installSnippet("code", "https://x/mcp")).toBe("claude mcp add --transport http portfolio https://x/mcp");
+    expect(JSON.parse(installSnippet("desktop", "https://x/mcp")).mcpServers.portfolio.args).toEqual([
+      "mcp-remote",
+      "https://x/mcp",
+    ]);
+  });
+
+  it("maps contact and MCP requests onto the diagram", async () => {
+    const { edgesFor } = await import("../public/js/lib.js");
+    expect(edgesFor({ route: "POST /api/contact", status: 202 })).toEqual(["vi", "ia", "ar"]);
+    expect(edgesFor({ route: "POST /mcp", status: 200 })).toEqual(["vi", "ia", "am"]);
+  });
+});
