@@ -10,6 +10,23 @@ export function el(tag, props = {}, ...children) {
   return node;
 }
 
+/** Renders markdownBlocks() output with text nodes: paragraphs, bullets, sub-headings and TODO notes. */
+export function renderBlocks(blocks, { headingTag = "h4" } = {}) {
+  const inline = (parts) => parts.map((p) => (p.bold ? el("strong", {}, p.text) : p.text));
+  return blocks.map((b) => {
+    if (b.type === "h3") return el(headingTag, { class: "md-h" }, b.text);
+    if (b.type === "li")
+      return el(
+        "div",
+        { class: "md-li" },
+        el("span", { attrs: { "aria-hidden": "true" } }, "–"),
+        el("span", {}, inline(b.parts)),
+      );
+    if (b.type === "todo") return el("p", { class: "md-todo" }, b.text);
+    return el("p", { class: "md-p" }, inline(b.parts));
+  });
+}
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 export function svg(tag, attrs = {}, ...children) {
