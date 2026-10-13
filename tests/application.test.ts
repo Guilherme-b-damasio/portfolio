@@ -4,7 +4,7 @@ import { BrowsePortfolio } from "../src/application/browse-portfolio.js";
 import { ReportStatus } from "../src/application/report-status.js";
 import type { Answerer } from "../src/domain/answer.js";
 import type { Content } from "../src/domain/content.js";
-import type { MetricsSnapshot, MetricsStore } from "../src/domain/metrics.js";
+import type { MetricsHistory, MetricsSnapshot, MetricsStore } from "../src/domain/metrics.js";
 import type { Hit, Retriever } from "../src/domain/search.js";
 
 const hit: Hit = {
@@ -77,8 +77,15 @@ describe("ReportStatus", () => {
   it("adds the active model to the metrics snapshot", () => {
     const snapshot = { uptimeSeconds: 1, routes: [] } as unknown as MetricsSnapshot;
     const metrics: MetricsStore = { record: () => {}, snapshot: () => snapshot, prometheus: () => "x 1\n" };
-    const report = new ReportStatus(metrics, null);
+    const history: MetricsHistory = { intervalMs: 300_000, points: () => [] };
+    const report = new ReportStatus(metrics, null, history);
     expect(report.status()).toEqual({ ...snapshot, llm: null });
     expect(report.prometheus()).toBe("x 1\n");
+  });
+
+  it("reports the history interval in seconds", () => {
+    const point = { t: 1, requestsLastMinute: 2, rssMb: 60 };
+    const report = new ReportStatus({} as MetricsStore, null, { intervalMs: 300_000, points: () => [point] });
+    expect(report.history()).toEqual({ intervalSeconds: 300, points: [point] });
   });
 });

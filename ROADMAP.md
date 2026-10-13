@@ -45,7 +45,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 - [ ] `ask --xray`: mostra as etapas (tokenização → ranking BM25 com scores → prompt montado → geração
       com tokens/s e custo estimado em US$)
 - [ ] Follow-up: conversa com memória curta guardada no cliente e enviada ao servidor com limite de tamanho
-- [ ] Citações clicáveis que rodam `cat <projeto>` e rolam até a seção
+- [x] Citações clicáveis que rodam `cat <projeto>` e rolam até a seção
 - [ ] `HttpRetriever` para o docsage, com fallback para o BM25 local. `ask --engine docsage|local`
 - [ ] Eval do RAG: ~20 perguntas com a fonte esperada e recall@3 calculado no CI (falha se cair)
 - [ ] Página `/evals` com o resultado do último eval
@@ -58,7 +58,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 - [ ] Porta `ClusterReader` + adapter da API do Kubernetes (só leitura, whitelist de namespaces) + fake para testes
 - [ ] `kubectl get pods` e painel "Cluster": node, pods, CPU/memória (metrics-server), restarts, idade
 - [ ] Manifests de RBAC só leitura em `deploy/` (Role/ClusterRole mínimos)
-- [ ] Ring buffer de 24h das métricas no processo, com sparklines no painel "Ao vivo"
+- [x] Ring buffer de 24h das métricas no processo, com sparklines no painel "Ao vivo"
 - [ ] `deploys`: linha do tempo commit → imagem → Flux → pod pronto (API do GitHub + eventos do cluster)
 
 ## 0.4 Playgrounds
@@ -68,13 +68,15 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
       `claude mcp add` na página
 - [ ] Playground de busca: sliders de `k1`, `b` e top-k, com o ranking se reordenando ao vivo
 - [ ] Laboratório de carga controlada: ≤ 200 requisições, uma corrida por vez no total, fila visível e latência via SSE
-- [ ] Diagrama de arquitetura vivo: SVG em que cada requisição real acende o caminho que percorreu
+- [x] Diagrama de arquitetura vivo: SVG em que cada requisição real acende o caminho que percorreu
 
 ## 0.5 Polimento
 
 - [ ] Terminal: autocomplete com Tab e `man <cmd>`
+  - [x] Autocomplete com Tab (comandos e slugs) e sugestão "você quis dizer"
+  - [ ] `man <cmd>`
 - [ ] Terminal: pipes simples (`| grep`, `| jq .campo`) e histórico salvo
-- [ ] Alternância de tema claro/escuro
+- [x] Alternância de tema claro/escuro
 - [ ] Versão em inglês (conteúdo bilíngue, `?lang=en`)
 - [ ] Imagem de compartilhamento (OG), meta tags e `robots.txt`
 - [ ] Acessibilidade: terminal usável só com teclado e leitor de tela; Lighthouse ≥ 95
