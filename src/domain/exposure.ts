@@ -1,3 +1,5 @@
+import type { HelloField, TlsFingerprint } from "./tls.js";
+
 /** Where a piece of evidence comes from, outermost first. */
 export type Layer = "rede" | "http" | "tls" | "navegador";
 
@@ -14,6 +16,8 @@ export interface Observation {
   headers: Record<string, string | undefined>; // lowercased names
   httpVersion: string;
   viaProxy: boolean; // behind Traefik: header order and TLS are re-made by the proxy
+  tls: TlsFingerprint | null; // only when the connection reached our own TLS listener
+  headerOrder: string[] | null; // header names as sent, only without a proxy in between
 }
 
 /** What the visitor's browser reported about itself. Every field is optional: scripts can be blocked or lie. */
@@ -102,5 +106,7 @@ export interface ExposureReport {
   signals: Signal[];
   findings: Finding[];
   summary: { exposures: number; contradictions: number; checks: number; probe: boolean };
+  // The visitor's own ClientHello, for the annotated hex dump.
+  tls: { ja4: string; ja4r: string; stack: string; bytes: number; hex: string; fields: HelloField[] } | null;
   scannedAt: string;
 }

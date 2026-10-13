@@ -26,7 +26,14 @@ const NOW = new Date(Date.UTC(2026, 9, 13, 15));
 
 function ctx(ua: string, headers: Record<string, string> = {}, probe: ClientProbe | null = null): ScanContext {
   return {
-    observation: { ip: "200.150.1.2", headers: { "user-agent": ua, ...headers }, httpVersion: "1.1", viaProxy: true },
+    observation: {
+      ip: "200.150.1.2",
+      headers: { "user-agent": ua, ...headers },
+      httpVersion: "1.1",
+      viaProxy: true,
+      tls: null,
+      headerOrder: null,
+    },
     probe,
     claimed: parseUserAgent(ua),
     reverseDns: null,
