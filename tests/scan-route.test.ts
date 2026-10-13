@@ -91,6 +91,14 @@ describe("/api/scan", () => {
     expect((await scan({}, { canvasHash: "<script>" })).status).toBe(400);
   });
 
+  it("serves the sample gallery as a cacheable list, outside the scan's rate limit", async () => {
+    for (let i = 0; i < 15; i++) {
+      const res = await fetch(`${base}/api/scan/tls-samples`);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("cache-control")).toBe("public, max-age=3600");
+    }
+  });
+
   it("rate limits scans per visitor", async () => {
     const statuses: number[] = [];
     for (let i = 0; i < 12; i++) statuses.push((await scan({ "user-agent": UA.curl })).status);

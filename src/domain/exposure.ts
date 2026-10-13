@@ -1,4 +1,4 @@
-import type { HelloField, TlsFingerprint } from "./tls.js";
+import type { TlsFingerprint, TlsView } from "./tls.js";
 
 /** Where a piece of evidence comes from, outermost first. */
 export type Layer = "rede" | "http" | "tls" | "navegador";
@@ -106,7 +106,6 @@ export interface ExposureReport {
   signals: Signal[];
   findings: Finding[];
   summary: { exposures: number; contradictions: number; checks: number; probe: boolean };
-  // The visitor's own ClientHello, for the annotated hex dump.
-  tls: { ja4: string; ja4r: string; stack: string; bytes: number; hex: string; fields: HelloField[] } | null;
+  tls: TlsView | null; // the visitor's own ClientHello, for the annotated hex dump
   scannedAt: string;
 }

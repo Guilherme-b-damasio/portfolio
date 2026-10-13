@@ -28,6 +28,28 @@ export interface TlsFingerprint {
   hello: ClientHello;
 }
 
+/** A real handshake captured from a known client, shown next to the visitor's for comparison. */
+export interface TlsSample {
+  id: string;
+  label: string;
+  client: string;
+  fingerprint: TlsFingerprint;
+}
+
+export interface TlsSampleSource {
+  samples(): TlsSample[];
+}
+
+/** What the page needs to draw a handshake: the fingerprint, the stack behind it and the annotated bytes. */
+export interface TlsView {
+  ja4: string;
+  ja4r: string;
+  stack: string;
+  bytes: number;
+  hex: string;
+  fields: HelloField[];
+}
+
 /** Fingerprints captured when a connection's TLS handshake arrived, looked up by the socket's address. */
 export interface TlsFingerprintSource {
   lookup(remoteAddress: string, remotePort: number): TlsFingerprint | null;

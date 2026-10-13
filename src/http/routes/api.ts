@@ -2,6 +2,7 @@ import express from "express";
 import { z } from "zod";
 import type { AskQuestion } from "../../application/ask-question.js";
 import type { BrowsePortfolio } from "../../application/browse-portfolio.js";
+import type { BrowseTlsSamples } from "../../application/browse-tls-samples.js";
 import type { InspectVisitor } from "../../application/inspect-visitor.js";
 import type { ReportStatus } from "../../application/report-status.js";
 import type { SendContact } from "../../application/send-contact.js";
@@ -19,6 +20,7 @@ export interface ApiDeps {
   sendContact: SendContact;
   inspectVisitor: InspectVisitor;
   tlsFingerprints?: TlsFingerprintSource | null; // set when the app also serves TLS itself
+  tlsSamples?: BrowseTlsSamples | null;
   askLimit?: { capacity: number; refillPerMinute: number };
   askConcurrency?: number; // questions answered at once, across every visitor
 }
@@ -42,7 +44,7 @@ export function askGuardsFor(deps: Pick<ApiDeps, "askLimit" | "askConcurrency">)
 }
 
 export function apiRouter(
-  { browse, askQuestion, reportStatus, sendContact, inspectVisitor, tlsFingerprints }: ApiDeps,
+  { browse, askQuestion, reportStatus, sendContact, inspectVisitor, tlsFingerprints, tlsSamples }: ApiDeps,
   logger: Logger,
   { bucket: askBucket, gate: askGate }: AskGuards,
 ) {
@@ -98,7 +100,7 @@ export function apiRouter(
   });
 
   api.use("/contact", contactRouter(sendContact, logger));
-  api.use("/scan", scanRouter(inspectVisitor, tlsFingerprints ?? null));
+  api.use("/scan", scanRouter(inspectVisitor, tlsFingerprints ?? null, tlsSamples ?? null));
 
   return api;
 }

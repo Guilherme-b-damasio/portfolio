@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { BrowseTlsSamples } from "../src/application/browse-tls-samples.js";
 import { InspectVisitor } from "../src/application/inspect-visitor.js";
 import { TlsStackCheck, TlsStrengthCheck } from "../src/application/scan/checks/tls.js";
 import { classifyStack } from "../src/application/scan/tls-stack.js";
@@ -8,6 +9,7 @@ import { parseUserAgent } from "../src/application/scan/user-agent.js";
 import type { ExposureCheck, ScanContext } from "../src/domain/exposure.js";
 import type { TlsFingerprint } from "../src/domain/tls.js";
 import { parseClientHello } from "../src/infrastructure/tls/client-hello.js";
+import { FileTlsSamples } from "../src/infrastructure/tls/file-tls-samples.js";
 import { ja4 } from "../src/infrastructure/tls/ja4.js";
 import { UA } from "./fixtures/user-agents.js";
 
@@ -15,7 +17,7 @@ const hello = (name: string): TlsFingerprint =>
   ja4(
     parseClientHello(
       Buffer.from(
-        readFileSync(path.join(import.meta.dirname, "fixtures", "client-hellos", `${name}.hex`), "utf8"),
+        readFileSync(path.join(import.meta.dirname, "..", "data", "tls-samples", `${name}.hex`), "utf8"),
         "hex",
       ),
     ),
@@ -109,5 +111,21 @@ describe("the report", () => {
       label: "caminho",
       value: "você → este processo, TLS de ponta a ponta",
     });
+  });
+});
+
+describe("the sample gallery", () => {
+  it("loads every captured handshake with its stack and annotated bytes", async () => {
+    const source = await FileTlsSamples.load(path.join(import.meta.dirname, "..", "data", "tls-samples"));
+    const views = new BrowseTlsSamples(source).list();
+    expect(views.map((v) => v.id)).toEqual(["chromium-152", "python-urllib", "node-openssl", "curl-schannel"]);
+    expect(views[0]).toMatchObject({
+      label: "Chromium 152",
+      ja4: chromium.ja4,
+      stack: expect.stringContaining("BoringSSL"),
+    });
+    expect(views[1].stack).toContain("OpenSSL");
+    expect(views[3].stack).toContain("Schannel");
+    for (const v of views) expect(v.hex.length).toBe(v.bytes * 2);
   });
 });

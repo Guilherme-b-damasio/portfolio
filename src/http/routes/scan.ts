@@ -1,5 +1,6 @@
 import express, { type Request } from "express";
 import { z } from "zod";
+import type { BrowseTlsSamples } from "../../application/browse-tls-samples.js";
 import type { InspectVisitor } from "../../application/inspect-visitor.js";
 import type { ClientProbe, Observation } from "../../domain/exposure.js";
 import type { TlsFingerprintSource } from "../../domain/tls.js";
@@ -82,9 +83,19 @@ function observe(req: Request, tlsSource: TlsFingerprintSource | null): Observat
  * GET scans the bare request (what curl or any script gives away); POST adds what the browser
  * reported about itself. Each scan is computed on the spot and answered; none is kept.
  */
-export function scanRouter(inspectVisitor: InspectVisitor, tlsSource: TlsFingerprintSource | null = null) {
+export function scanRouter(
+  inspectVisitor: InspectVisitor,
+  tlsSource: TlsFingerprintSource | null = null,
+  tlsSamples: BrowseTlsSamples | null = null,
+) {
   const router = express.Router();
   const bucket = new TokenBucket(10, 10); // a DNS lookup each: cheap, but not free
+
+  // Fixed captures, the same for everyone: cacheable and outside the scan's rate limit.
+  router.get("/tls-samples", (_req, res) => {
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.json(tlsSamples?.list() ?? []);
+  });
 
   router.use(rateLimit(bucket), (_req, res, next) => {
     res.setHeader("Cache-Control", "no-store");

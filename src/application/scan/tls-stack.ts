@@ -1,5 +1,5 @@
 import type { ClaimedIdentity } from "../../domain/exposure.js";
-import { type ClientHello, isGrease } from "../../domain/tls.js";
+import { type ClientHello, isGrease, type TlsFingerprint, type TlsView } from "../../domain/tls.js";
 
 export type TlsFamily = "boringssl" | "apple" | "nss" | "openssl" | "schannel" | "go" | "desconhecida";
 
@@ -42,4 +42,9 @@ export function expectedFamily(claimed: ClaimedIdentity): TlsFamily | null {
   if (claimed.browser === "firefox") return "nss";
   if (claimed.browser === "safari") return "apple";
   return null;
+}
+
+export function tlsView({ ja4, ja4r, hello }: TlsFingerprint): TlsView {
+  const stack = FAMILY_NAMES[classifyStack(hello).family];
+  return { ja4, ja4r, stack, bytes: hello.bytes, hex: hello.hex, fields: hello.fields };
 }

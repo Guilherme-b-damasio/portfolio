@@ -1,0 +1,22 @@
+[
+  {
+    "file": "chromium-152.hex",
+    "label": "Chromium 152",
+    "client": "Chromium 152 no Windows (app desktop do Claude, Electron)"
+  },
+  {
+    "file": "python-urllib.hex",
+    "label": "Python urllib",
+    "client": "Python 3.14, urllib, OpenSSL 3.0.18"
+  },
+  {
+    "file": "node-openssl.hex",
+    "label": "Node.js 26",
+    "client": "Node.js 26, tls.connect, OpenSSL 3.5.9"
+  },
+  {
+    "file": "curl-schannel.hex",
+    "label": "curl no Windows",
+    "client": "curl 8.14.1, Schannel (a pilha TLS do Windows)"
+  }
+]

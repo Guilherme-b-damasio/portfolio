@@ -8,7 +8,7 @@ import { cipherName, extensionName, groupName } from "../src/infrastructure/tls/
 
 // Real ClientHellos captured on 2026-10-13 from clients hitting a local socket (SNI "localhost").
 const fixture = (name: string) =>
-  Buffer.from(readFileSync(path.join(import.meta.dirname, "fixtures", "client-hellos", `${name}.hex`), "utf8"), "hex");
+  Buffer.from(readFileSync(path.join(import.meta.dirname, "..", "data", "tls-samples", `${name}.hex`), "utf8"), "hex");
 const chromium = fixture("chromium-152"); // Chromium 152 (Claude desktop / Electron)
 const node = fixture("node-openssl"); // Node 26, OpenSSL 3.5
 const python = fixture("python-urllib"); // Python 3.14 urllib, OpenSSL 3.0

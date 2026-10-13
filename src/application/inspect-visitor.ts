@@ -11,7 +11,7 @@ import type {
 } from "../domain/exposure.js";
 import { isGrease } from "../domain/tls.js";
 import { addressKind, ipVersion, plainIp } from "./scan/ip.js";
-import { classifyStack, FAMILY_NAMES } from "./scan/tls-stack.js";
+import { classifyStack, FAMILY_NAMES, tlsView } from "./scan/tls-stack.js";
 import { parseUserAgent } from "./scan/user-agent.js";
 
 const ORDER: Record<Verdict, number> = { contradicao: 0, exposto: 1, info: 2, ok: 3 };
@@ -77,14 +77,7 @@ export class InspectVisitor {
         checks: this.checks.length,
         probe: probe != null,
       },
-      tls: observation.tls && {
-        ja4: observation.tls.ja4,
-        ja4r: observation.tls.ja4r,
-        stack: FAMILY_NAMES[classifyStack(observation.tls.hello).family],
-        bytes: observation.tls.hello.bytes,
-        hex: observation.tls.hello.hex,
-        fields: observation.tls.hello.fields,
-      },
+      tls: observation.tls && tlsView(observation.tls),
       scannedAt: ctx.now.toISOString(),
     };
   }
