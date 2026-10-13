@@ -1,5 +1,6 @@
 import { api } from "./api.js";
 import { el } from "./dom.js";
+import { collectProbe } from "./probe.js";
 import {
   citationParts,
   commandForSource,
@@ -9,10 +10,12 @@ import {
   highlightParts,
   PAGES,
   parseLine,
+  scanHeadline,
   sections,
+  VERDICTS,
 } from "./lib.js";
 
-const COMMANDS = ["help", "whoami", "ls", "cat", "ask", "status", "curl", "open", "clear"];
+const COMMANDS = ["help", "whoami", "ls", "cat", "ask", "status", "scan", "curl", "open", "clear"];
 const OPENABLE = PAGES.filter((p) => p !== "inicio");
 const CHIPS = ["whoami", "ls projects", 'ask "como funciona o docsage?"', "status", "curl /api/projects", "help"];
 const isTodo = (text) => /^TODO\b/.test(text.trim());
@@ -90,6 +93,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ["cat <projeto>", "detalhes de um projeto"],
         ['ask "<pergunta>"', "pergunta ao RAG sobre mim"],
         ["status", "métricas ao vivo deste servidor"],
+        ["scan", "o que este site sabe sobre você"],
         ["curl <caminho>", "chama a API crua, ex: curl /api/profile"],
         ["open <página>", OPENABLE.join(" · ")],
         ["clear", "limpa a tela"],
@@ -282,6 +286,32 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ["commit", body.build.commit.slice(0, 7)],
       ];
       print(...rows.map(([k, v]) => line([dim(k.padEnd(11)), v])));
+    },
+
+    async scan() {
+      const loading = line([acc("·   "), dim("sondando o navegador…")]);
+      print(loading);
+      const probe = await collectProbe().catch(() => null);
+      const { res, body } = await api(
+        "/api/scan",
+        probe
+          ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(probe) }
+          : undefined,
+      );
+      loading.remove();
+      if (!res.ok) return res.status >= 500 ? failed(res.status) : say(warn("! "), body.error ?? `erro ${res.status}`);
+
+      say(bold(scanHeadline(body)));
+      const marks = { contradicao: "✗", exposto: "!", info: "·", ok: "✓" };
+      for (const f of body.findings.filter((f) => f.verdict !== "ok")) {
+        const tag = `${marks[f.verdict]} ${VERDICTS[f.verdict]}`.padEnd(15);
+        print(line([f.verdict === "info" ? dim(tag) : warn(tag), f.title]));
+      }
+      const ok = body.findings.filter((f) => f.verdict === "ok").length;
+      say(
+        dim(`${ok} verificações ok · ${body.summary.checks} regras · nada foi salvo  `),
+        runButton("ver evidências em /voce", "open voce"),
+      );
     },
 
     async curl(args) {
