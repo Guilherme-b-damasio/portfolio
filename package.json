@@ -11,6 +11,7 @@
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "e2e": "playwright test",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "inspect": "npx @modelcontextprotocol/inspector"
@@ -27,6 +28,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.64.0",
     "@types/express": "^5.0.6",
     "@types/node": "^20.19.0",
     "eslint": "^9.39.5",
