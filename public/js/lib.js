@@ -250,3 +250,28 @@ export function ja4Parts(ja4) {
     { text: `_${extHash}`, meaning: "hash das extensões e assinaturas" },
   ];
 }
+
+/**
+ * Reads complete server-sent events out of what has arrived so far. Returns them with the
+ * unfinished tail, which goes back in front of the next chunk. Only `event:` and `data:` matter here.
+ */
+export function parseSse(buffer) {
+  const blocks = buffer.replaceAll("\r\n", "\n").split("\n\n");
+  const rest = blocks.pop();
+  const events = [];
+  for (const block of blocks) {
+    let event = "message";
+    const data = [];
+    for (const field of block.split("\n")) {
+      if (field.startsWith("event:")) event = field.slice(6).trim();
+      else if (field.startsWith("data:")) data.push(field.slice(5).replace(/^ /, ""));
+    }
+    if (!data.length) continue; // a comment or keep-alive
+    try {
+      events.push({ event, data: JSON.parse(data.join("\n")) });
+    } catch {
+      /* not JSON: not one of ours */
+    }
+  }
+  return { events, rest };
+}
