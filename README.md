@@ -24,6 +24,7 @@ still start with `TODO` are left out of the index.
 | `TLS_CERT_FILE`, `TLS_KEY_FILE` | unset | Also serve HTTPS on `TLS_PORT` (default `8443`) and fingerprint each visitor's TLS handshake. Re-read every 6 h |
 | `TLS_PROXY_PROTOCOL` | unset | `1` when that port sits behind a TCP passthrough that sends the PROXY protocol; the header then becomes mandatory |
 | `ASK_MAX_CONCURRENCY` | `4`             | Questions answered at once across every visitor (HTTP and MCP); above it, 503 with `Retry-After` |
+| `ASK_TIMEOUT_MS`    | `60000`           | Generation for one question is aborted past this; a visitor who disconnects aborts it too |
 | `GIT_SHA`, `BUILT_AT` | `dev`           | Shown in the footer and `/api/status` (set as Docker build args) |
 | `RESEND_API_KEY`, `CONTACT_TO` | unset | Turn on the contact form; messages go to `CONTACT_TO` through Resend |
 | `CONTACT_FROM`      | `onboarding@resend.dev` | Sender shown in the e-mail (needs a verified domain on Resend to change) |
@@ -48,6 +49,7 @@ still start with `TODO` are left out of the index.
 | `GET /api/projects?tag=`  | Without bodies                              |
 | `GET /api/projects/:slug` |                                             |
 | `POST /api/ask`           | `{ question }`, 5 per client, refills 5/min; 503 + `Retry-After` when `ASK_MAX_CONCURRENCY` are already running |
+| `POST /api/ask` + `Accept: text/event-stream` | Same limits, streamed: `passages` (BM25 hits and timing), `text` (each piece of the answer), then `done` (the full JSON result) or `error` |
 | `GET /api/ask/quota`      | The caller's remaining questions, without spending one |
 | `GET /api/skills`         | Skill groups with where each one shows up (`content/skills.md`) |
 | `GET /api/contact`        | Whether the contact form is on |
@@ -59,6 +61,12 @@ still start with `TODO` are left out of the index.
 | `GET /api/status/history` | In-process samples every 5 min for the last 24h (reset on restart) |
 | `GET /metrics`            | Prometheus text format, including `portfolio_llm_tokens_used_today` |
 | `GET /healthz`            | Probes                                      |
+
+Try the stream with curl:
+
+```bash
+curl -N -H 'content-type: application/json' -H 'accept: text/event-stream'   -d '{"question":"o que é o docsage?"}' http://localhost:3000/api/ask
+```
 
 ## Visitor scan (`/voce`)
 

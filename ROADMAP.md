@@ -41,7 +41,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 
 ## 0.2 IA à mostra
 
-- [ ] Streaming SSE no `/api/ask` (`text/event-stream`), com os tokens aparecendo no terminal enquanto são gerados
+- [x] Streaming SSE no `/api/ask` (`text/event-stream`), com os tokens aparecendo no terminal enquanto são gerados
 - [ ] `ask --xray`: mostra as etapas (tokenização → ranking BM25 com scores → prompt montado → geração
       com tokens/s e custo estimado em US$)
 - [ ] Follow-up: conversa com memória curta guardada no cliente e enviada ao servidor com limite de tamanho
