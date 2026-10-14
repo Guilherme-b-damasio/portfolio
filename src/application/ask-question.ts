@@ -1,10 +1,17 @@
 import type { Answerer, AskResult } from "../domain/answer.js";
-import type { Retriever } from "../domain/search.js";
+import type { Hit, Retriever } from "../domain/search.js";
 import type { TokenBudget } from "../domain/token-budget.js";
 
 export interface AskOptions {
   topK?: number;
   budget?: TokenBudget | null; // without one, generation is never cut off
+}
+
+/** Hooks for showing an answer while it is produced (the SSE route); the JSON route passes none. */
+export interface AskProgress {
+  onPassages?: (passages: Hit[], retrievalMs: number) => void;
+  onText?: (delta: string) => void;
+  signal?: AbortSignal;
 }
 
 /**
@@ -28,10 +35,11 @@ export class AskQuestion {
     return this.answerer?.model ?? null;
   }
 
-  async execute(question: string): Promise<AskResult> {
+  async execute(question: string, { onPassages, onText, signal }: AskProgress = {}): Promise<AskResult> {
     const t0 = performance.now();
     const passages = await this.retriever.search(question, this.topK);
     const retrieval = performance.now() - t0;
+    onPassages?.(passages, retrieval);
 
     const onlyPassages = (degraded: AskResult["degraded"] = null): AskResult => ({
       answer: null,
@@ -46,7 +54,7 @@ export class AskQuestion {
     if (this.budget && !this.budget.canSpend()) return onlyPassages("token-budget");
 
     const t1 = performance.now();
-    const { text, inputTokens, outputTokens } = await this.answerer.answer(question, passages);
+    const { text, inputTokens, outputTokens } = await this.answerer.answer(question, passages, { onText, signal });
     this.budget?.charge(inputTokens + outputTokens);
     return {
       answer: text,

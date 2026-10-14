@@ -69,6 +69,36 @@ describe("AskQuestion", () => {
     expect(called).toBe(false);
     expect(result).toMatchObject({ answer: null, passages: [hit], model: null, degraded: "token-budget" });
   });
+
+  it("reports the passages first, then each piece of the answer, and hands the signal to the LLM", async () => {
+    const events: string[] = [];
+    let received: AbortSignal | undefined;
+    const answerer: Answerer = {
+      model: "fake",
+      answer: async (_q, _p, { onText, signal } = {}) => {
+        received = signal;
+        events.push("generating");
+        onText?.("a");
+        onText?.("b");
+        return { text: "ab", inputTokens: 1, outputTokens: 2 };
+      },
+    };
+    const signal = new AbortController().signal;
+    const result = await new AskQuestion(fixedRetriever([hit]), answerer).execute("pergunta", {
+      onPassages: (passages, ms) => events.push(`passages:${passages.length}:${ms >= 0}`),
+      onText: (d) => events.push(`text:${d}`),
+      signal,
+    });
+    expect(events).toEqual(["passages:1:true", "generating", "text:a", "text:b"]);
+    expect(received).toBe(signal);
+    expect(result.answer).toBe("ab");
+  });
+
+  it("still reports the passages when there is no LLM to stream from", async () => {
+    const seen: Hit[][] = [];
+    await new AskQuestion(fixedRetriever([hit]), null).execute("pergunta", { onPassages: (p) => seen.push(p) });
+    expect(seen).toEqual([[hit]]);
+  });
 });
 
 describe("BrowsePortfolio", () => {
