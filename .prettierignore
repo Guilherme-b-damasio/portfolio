@@ -4,3 +4,5 @@ package-lock.json
 content
 *.md
 k8s
+test-results
+playwright-report
