@@ -6,10 +6,15 @@ export interface Generation {
   outputTokens: number;
 }
 
+export interface AnswerOptions {
+  onText?: (delta: string) => void; // called with each piece of the answer as it is written
+  signal?: AbortSignal; // aborts generation, e.g. when the visitor closes the stream
+}
+
 /** Turns a question plus retrieved passages into a written answer. */
 export interface Answerer {
   readonly model: string;
-  answer(question: string, passages: Hit[]): Promise<Generation>;
+  answer(question: string, passages: Hit[], options?: AnswerOptions): Promise<Generation>;
 }
 
 export interface AskResult {
