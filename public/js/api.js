@@ -1,4 +1,4 @@
-import { routeLabel } from "./lib.js";
+import { parseSse, routeLabel } from "./lib.js";
 
 /** Every request the page makes is announced here, so the diagram and the request log show real traffic. */
 export const requests = new EventTarget();
@@ -23,6 +23,46 @@ export async function api(path, { auto = false, ...init } = {}) {
   const ms = performance.now() - started;
   announce({ ...base, status: res.status, ms, generated: Boolean(body?.model) });
   return { res, body, ms, type };
+}
+
+/**
+ * Like api(), but asks for a server-sent event stream and hands each event to `onEvent` as it
+ * arrives. Errors the server answers before streaming (400, 429, 503) come back as plain JSON.
+ * Resolves with the `done` event's data as `body`, or `{ error }` when the stream broke.
+ */
+export async function apiStream(path, init, onEvent) {
+  const method = init.method ?? "GET";
+  const base = { method, path, route: routeLabel(method, path), auto: false };
+  const started = performance.now();
+  let res;
+  try {
+    res = await fetch(path, { ...init, headers: { ...init.headers, accept: "text/event-stream" } });
+  } catch (err) {
+    announce({ ...base, status: 0, ms: performance.now() - started });
+    throw err;
+  }
+  let body = null;
+  if (!(res.headers.get("content-type") ?? "").includes("text/event-stream")) {
+    body = await res.json().catch(() => ({}));
+  } else {
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const parsed = parseSse(buffer + value);
+      buffer = parsed.rest;
+      for (const { event, data } of parsed.events) {
+        if (event === "done") body = data;
+        else if (event === "error") body = { error: data.error };
+        else onEvent(event, data);
+      }
+    }
+    body ??= { error: "A conexão caiu no meio da resposta." };
+  }
+  const ms = performance.now() - started;
+  announce({ ...base, status: res.status, ms, generated: Boolean(body?.model) });
+  return { res, body, ms };
 }
 
 function announce(detail) {
