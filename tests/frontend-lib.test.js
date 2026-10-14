@@ -13,6 +13,7 @@ import {
   hourStrip,
   ja4Parts,
   parseLine,
+  parseSse,
   routeLabel,
   scanHeadline,
   sections,
@@ -185,5 +186,16 @@ describe("hex dump helpers", () => {
       "hash das extensões e assinaturas",
     ]);
     expect(ja4Parts("lixo")).toEqual([]);
+  });
+
+  it("reads whole server-sent events and keeps the unfinished tail for the next chunk", () => {
+    const first = parseSse('event: passages\ndata: {"n":1}\n\nevent: text\ndata: {"delta":"Ol');
+    expect(first.events).toEqual([{ event: "passages", data: { n: 1 } }]);
+    const second = parseSse(first.rest + 'á"}\r\n\r\n: keep-alive\n\ndata: {"x":2}\n\n');
+    expect(second.events).toEqual([
+      { event: "text", data: { delta: "Olá" } },
+      { event: "message", data: { x: 2 } },
+    ]);
+    expect(second.rest).toBe("");
   });
 });

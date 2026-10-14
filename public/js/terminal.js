@@ -1,4 +1,4 @@
-import { api } from "./api.js";
+import { api, apiStream } from "./api.js";
 import { el } from "./dom.js";
 import { collectProbe } from "./probe.js";
 import {
@@ -157,7 +157,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
       const question = args.join(" ");
       if (!question) return say(warn("! "), 'uso: ask "sua pergunta"');
 
-      const loading = line([acc("·   "), dim("buscando trechos…")]);
+      let loading = line([acc("·   "), dim("buscando trechos…")]);
       print(loading);
       let frame = 0;
       const spin = setInterval(() => {
@@ -165,19 +165,37 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         loading.firstChild.textContent = ["·   ", "··  ", "··· "][frame % 3];
       }, 260);
 
+      // The answer is written into this line as the server streams it, then rebuilt with citations.
+      let streamed = null;
+      const onEvent = (event, data) => {
+        if (event === "passages" && data.passages.length) {
+          loading.lastChild.textContent = `${data.passages.length} trechos em ${formatMs(data.retrievalMs)}, escrevendo…`;
+        } else if (event === "text") {
+          if (!streamed) {
+            clearInterval(spin);
+            streamed = line([], "t-answer t-streaming");
+            loading.replaceWith(streamed);
+            loading = streamed;
+          }
+          streamed.append(data.delta);
+          out.scrollTop = out.scrollHeight;
+        }
+      };
+
       let response;
       try {
-        response = await api("/api/ask", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ question }),
-        });
+        response = await apiStream(
+          "/api/ask",
+          { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question }) },
+          onEvent,
+        );
       } catch {
         clearInterval(spin);
         loading.remove();
         return failed(0);
       }
       clearInterval(spin);
+      streamed?.classList.remove("t-streaming");
       const { res, body, ms } = response;
       const remaining = Number(res.headers.get("x-ratelimit-remaining"));
       const limit = Number(res.headers.get("x-ratelimit-limit"));
@@ -209,6 +227,11 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
       if (!res.ok) {
         loading.remove();
         return res.status >= 500 ? failed(res.status) : say(warn("! "), body.error ?? `erro ${res.status}`);
+      }
+      if (body.error) {
+        // The stream broke after it opened: keep what was written and say it stopped.
+        if (!streamed) loading.remove();
+        return say(warn("! "), body.error);
       }
 
       if (!body.passages.length) {

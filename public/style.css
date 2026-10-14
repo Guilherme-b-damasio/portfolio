@@ -580,6 +580,21 @@ a:hover {
 .t-answer {
   margin-bottom: 6px;
 }
+.t-streaming::after {
+  content: "▍";
+  color: var(--term-accent);
+  animation: t-blink 1s steps(1) infinite;
+}
+@keyframes t-blink {
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-streaming::after {
+    animation: none;
+  }
+}
 .t-meta {
   margin-top: 4px;
 }

@@ -52,3 +52,38 @@ test("the page does not scroll sideways", async ({ home }) => {
   const overflow = await home.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test("ask renders a streamed answer with clickable citations", async ({ home }) => {
+  // The CI server has no LLM key, so the stream is replayed here; the parsing and rendering are real.
+  const passage = {
+    chunk: { id: "docsage.md#0", source: "docsage.md › O que é", text: "RAG" },
+    score: 2,
+    matchedTerms: [],
+  };
+  const done = {
+    answer: "É um RAG [docsage.md › O que é].",
+    passages: [passage],
+    model: "claude-test",
+    usage: { inputTokens: 40, outputTokens: 9 },
+    latencyMs: { retrieval: 1, generation: 20 },
+    degraded: null,
+  };
+  const sse = (event: string, data: unknown) => `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  await home.route("**/api/ask", (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { "content-type": "text/event-stream", "x-ratelimit-remaining": "4", "x-ratelimit-limit": "5" },
+      body:
+        sse("passages", { passages: [passage], retrievalMs: 1 }) +
+        sse("text", { delta: "É um RAG " }) +
+        sse("text", { delta: "[docsage.md › O que é]." }) +
+        sse("done", done),
+    }),
+  );
+  await run(home, 'ask "o que é o docsage?"');
+  const answer = home.locator("#term-out .t-answer").last();
+  await expect(answer).toContainText("É um RAG");
+  await expect(answer).not.toHaveClass(/t-streaming/);
+  await expect(answer.getByRole("button", { name: "docsage.md › O que é" })).toBeVisible();
+  await expect(home.locator("#term-out .t-meta").last()).toContainText("40→9 tokens");
+});
