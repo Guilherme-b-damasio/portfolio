@@ -61,6 +61,7 @@ const app = createApp({
   logger,
   publicDir: path.join(root, "public"),
   askConcurrency: Number(process.env.ASK_MAX_CONCURRENCY ?? 4),
+  askTimeoutMs: Number(process.env.ASK_TIMEOUT_MS ?? 60_000),
 });
 
 const server = app.listen(port, () => {

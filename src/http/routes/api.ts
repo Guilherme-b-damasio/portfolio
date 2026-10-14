@@ -10,6 +10,7 @@ import type { Logger } from "../../domain/logger.js";
 import type { TappedConnections } from "../../domain/tls.js";
 import { concurrencyCap, ConcurrencyGate } from "../middleware/concurrency.js";
 import { rateLimit, TokenBucket } from "../middleware/rate-limit.js";
+import { openEventStream } from "../sse.js";
 import { contactRouter } from "./contact.js";
 import { scanRouter } from "./scan.js";
 
@@ -23,6 +24,7 @@ export interface ApiDeps {
   tlsSamples?: BrowseTlsSamples | null;
   askLimit?: { capacity: number; refillPerMinute: number };
   askConcurrency?: number; // questions answered at once, across every visitor
+  askTimeoutMs?: number; // generation is aborted past this, streamed or not
 }
 
 const askBody = z.object({ question: z.string().trim().min(2).max(500) });
@@ -44,7 +46,16 @@ export function askGuardsFor(deps: Pick<ApiDeps, "askLimit" | "askConcurrency">)
 }
 
 export function apiRouter(
-  { browse, askQuestion, reportStatus, sendContact, inspectVisitor, tapped, tlsSamples }: ApiDeps,
+  {
+    browse,
+    askQuestion,
+    reportStatus,
+    sendContact,
+    inspectVisitor,
+    tapped,
+    tlsSamples,
+    askTimeoutMs = 60_000,
+  }: ApiDeps,
   logger: Logger,
   { bucket: askBucket, gate: askGate }: AskGuards,
 ) {
@@ -84,10 +95,40 @@ export function apiRouter(
       res.status(400).json({ error: "Envie { question: string } com 2 a 500 caracteres." });
       return;
     }
+    // A visitor who leaves or a generation that runs too long stops spending tokens right away.
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(new Error("ask timed out")), askTimeoutMs);
+    res.once("close", () => {
+      clearTimeout(timer);
+      abort.abort();
+    });
+    const question = parsed.data.question;
+
+    if (!req.get("accept")?.includes("text/event-stream")) {
+      try {
+        res.json(await askQuestion.execute(question, { signal: abort.signal }));
+      } catch (err) {
+        next(err);
+      }
+      return;
+    }
+
+    const stream = openEventStream(res);
     try {
-      res.json(await askQuestion.execute(parsed.data.question));
+      const result = await askQuestion.execute(question, {
+        onPassages: (passages, retrievalMs) => stream.send("passages", { passages, retrievalMs }),
+        onText: (delta) => stream.send("text", { delta }),
+        signal: abort.signal,
+      });
+      stream.send("done", result);
     } catch (err) {
-      next(err);
+      // Once the stream is open the status is already 200, so failures travel as an event.
+      if (!res.destroyed) {
+        logger.error((err as Error)?.message ?? "ask stream failed", { requestId: res.locals.requestId });
+        stream.send("error", { error: "A resposta foi interrompida do lado de cá." });
+      }
+    } finally {
+      stream.end();
     }
   });
 
