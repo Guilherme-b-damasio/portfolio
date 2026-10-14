@@ -8,6 +8,7 @@ API, and live metrics (`/api/status`, Prometheus at `/metrics`). Runs on k3s.
 npm install
 npm run dev          # http://localhost:3000
 npm test
+npm run e2e          # Playwright smoke against the real server (E2E_CHANNEL=chrome reuses an installed Chrome)
 ```
 
 Content lives in `content/` as Markdown: `profile.md` plus one file per project in
@@ -26,6 +27,18 @@ still start with `TODO` are left out of the index.
 | `GIT_SHA`, `BUILT_AT` | `dev`           | Shown in the footer and `/api/status` (set as Docker build args) |
 | `RESEND_API_KEY`, `CONTACT_TO` | unset | Turn on the contact form; messages go to `CONTACT_TO` through Resend |
 | `CONTACT_FROM`      | `onboarding@resend.dev` | Sender shown in the e-mail (needs a verified domain on Resend to change) |
+
+## What's new in 0.1
+
+- Ports and adapters layout (`domain/`, `application/`, `infrastructure/`, `http/`), with the
+  dependency rule checked by a test.
+- ESLint + Prettier in CI, JSON logs with `x-request-id`, and security headers with a CSP that
+  allows no inline scripts.
+- `/api/ask` is bounded three ways: a per-visitor token bucket, a global concurrency cap (503 with
+  `Retry-After`) and a daily LLM token budget that falls back to retrieval only.
+- Every push to `develop` publishes `ghcr.io/guilherme-b-damasio/portfolio:<timestamp>-<sha>`.
+- A Playwright smoke test opens the page at desktop and 375px, runs `help`, `ask` and `status`
+  against the real server, and fails on any console error, failed request or sideways scroll.
 
 ## API
 

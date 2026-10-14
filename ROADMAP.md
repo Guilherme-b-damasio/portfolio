@@ -32,7 +32,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
       só-recuperação e o terminal avisa. Com testes
 - [x] Workflow que constrói a imagem e publica em `ghcr.io/guilherme-b-damasio/portfolio:<YYYYMMDDHHmmss>-<sha>`
       a cada push na `develop`, mais um `docker build` verificado no CI
-- [ ] Smoke test e2e com Playwright no CI: abre a página, roda `help`, `ask` e `status`
+- [x] Smoke test e2e com Playwright no CI: abre a página, roda `help`, `ask` e `status`
 - [ ] **[dono]** Conteúdo real em `content/`: bio e 3 a 5 projetos com "Decisões técnicas" e "O que aprendi"
 - [ ] **[dono]** Domínio, DNS e TLS (emissor de teste primeiro)
 - [ ] **[dono]** Registrar o app no repositório de infra (deployment, service, ingress, `ImageRepository`/`ImagePolicy`).
