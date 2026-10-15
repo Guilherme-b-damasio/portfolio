@@ -43,11 +43,11 @@ async function start(answerer: Answerer, askTimeoutMs?: number) {
   return `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 }
 
-const askStream = (base: string) =>
+const askStream = (base: string, extra: Record<string, unknown> = {}) =>
   fetch(`${base}/api/ask`, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "text/event-stream" },
-    body: JSON.stringify({ question: "o que é?" }),
+    body: JSON.stringify({ question: "o que é?", ...extra }),
   });
 
 /** Splits an SSE body into its events, in order. */
@@ -97,6 +97,21 @@ describe("POST /api/ask as an event stream", () => {
     });
     expect(res.headers.get("content-type")).toMatch(/json/);
     expect((await res.json()).answer).toBe("Isso é [a.md › Intro]");
+  });
+
+  it("adds the x-ray to the final result only when asked", async () => {
+    const base = await start(streaming);
+    const plain = events(await (await askStream(base)).text()).at(-1)!;
+    const xray = events(await (await askStream(base, { xray: true })).text()).at(-1)!;
+
+    expect(plain.data).not.toHaveProperty("xray");
+    expect(xray.event).toBe("done");
+    expect(xray.data.xray.ranking).toEqual([{ source: "a.md › Intro", score: 1, matchedTerms: [], kept: true }]);
+    expect(xray.data.xray.generation.firstTokenMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it("rejects an x-ray flag that is not a boolean", async () => {
+    expect((await askStream(await start(streaming), { xray: "sim" })).status).toBe(400);
   });
 
   it("ends with an error event when generation fails after the stream opened", async () => {

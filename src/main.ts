@@ -13,6 +13,7 @@ import { SendContact } from "./application/send-contact.js";
 import { createApp } from "./http/app.js";
 import { MarkdownContentSource } from "./infrastructure/content/markdown-content-source.js";
 import { JsonLogger } from "./infrastructure/logging/json-logger.js";
+import { AnthropicPriceList } from "./infrastructure/llm/anthropic-price-list.js";
 import { ClaudeAnswerer } from "./infrastructure/llm/claude-answerer.js";
 import { DailyTokenBudget } from "./infrastructure/llm/daily-token-budget.js";
 import { ResendMailer } from "./infrastructure/mail/resend-mailer.js";
@@ -51,7 +52,7 @@ const tap = certFile && keyFile ? new TlsTap({ proxyProtocol: process.env.TLS_PR
 
 const app = createApp({
   browse: new BrowsePortfolio(content),
-  askQuestion: new AskQuestion(retriever, answerer, { budget }),
+  askQuestion: new AskQuestion(retriever, answerer, { budget, prices: new AnthropicPriceList() }),
   reportStatus: new ReportStatus(metrics, answerer?.model ?? null, history, budget),
   sendContact: new SendContact(mailer),
   inspectVisitor: new InspectVisitor(scanChecks(), new DnsReverseLookup()),
