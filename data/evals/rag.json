@@ -1,0 +1,30 @@
+{
+  "k": 3,
+  "minRecall": 0.9,
+  "cases": [
+    { "question": "o que é o docsage?", "expected": ["docsage.md"] },
+    { "question": "como o docsage divide os documentos em chunks?", "expected": ["docsage.md › Decisões técnicas"] },
+    { "question": "o docsage reindexa tudo toda vez?", "expected": ["docsage.md › Decisões técnicas"] },
+    { "question": "quais formatos de arquivo o docsage indexa?", "expected": ["docsage.md › O que é"] },
+    { "question": "o docsage funciona como servidor MCP?", "expected": ["docsage.md"] },
+    { "question": "o que o clawd-tracker faz?", "expected": ["clawd-tracker.md"] },
+    { "question": "como o teclado mostra o que o Claude Code está fazendo?", "expected": ["clawd-tracker.md"] },
+    { "question": "onde roda o devdek?", "expected": ["devdek.md"] },
+    { "question": "onde você trabalha hoje?", "expected": ["profile.md › Sobre", "profile.md › Experiência"] },
+    { "question": "qual sua formação?", "expected": ["profile.md › Formação"] },
+    { "question": "você tem experiência com AWS Lambda?", "expected": ["profile.md"] },
+    { "question": "quais bancos de dados você conhece?", "expected": ["profile.md › Stack"] },
+    { "question": "você já trabalhou com Kubernetes?", "expected": ["profile.md"] },
+    { "question": "como você trabalha em time?", "expected": ["profile.md › Como eu trabalho"] },
+    { "question": "o que você fez na UltraLIMS?", "expected": ["profile.md › Experiência", "profile.md › Sobre"] },
+    {
+      "question": "você escreve testes? qual foi o coverage?",
+      "expected": ["profile.md › Como eu trabalho", "profile.md › Experiência"]
+    },
+    { "question": "quais linguagens de programação você usa?", "expected": ["profile.md › Stack"] },
+    { "question": "você tem projetos com RAG?", "expected": ["docsage.md", "profile.md › Sobre"] },
+    { "question": "como este site faz deploy?", "expected": ["profile.md › Como eu trabalho"] },
+    { "question": "quais ferramentas de observabilidade você usa?", "expected": ["profile.md"] },
+    { "question": "você usa mensageria com SQS e SNS?", "expected": ["profile.md"] }
+  ]
+}
