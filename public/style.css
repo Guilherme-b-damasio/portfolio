@@ -606,6 +606,32 @@ a:hover {
 .t-dim {
   color: var(--term-dim);
 }
+.t-token {
+  padding-inline: 4px;
+  border: 1px solid var(--term-line);
+  color: var(--term-accent);
+}
+.t-cut {
+  opacity: 0.7;
+}
+.t-prompt {
+  margin-block: 4px 8px;
+  padding-left: 12px;
+  border-left: 2px solid var(--term-line);
+}
+.t-prompt summary {
+  color: var(--term-accent);
+  cursor: pointer;
+}
+.t-prompt pre {
+  margin: 6px 0 0;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font: inherit;
+  color: var(--term-dim);
+}
 .t-acc {
   color: var(--term-accent);
 }
