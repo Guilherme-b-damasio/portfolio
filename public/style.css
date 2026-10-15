@@ -937,6 +937,33 @@ a:hover {
   color: var(--color-accent-text);
 }
 
+/* ---------- evals ---------- */
+.evals-table td:first-child {
+  white-space: normal;
+}
+.evals-table .link-btn {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.evals-table .link-btn:hover,
+.evals-table .link-btn:focus-visible {
+  color: var(--color-accent-text);
+  text-decoration: underline;
+}
+.eval-miss {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+
 /* ---------- architecture ---------- */
 .arch {
   grid-template-columns: minmax(0, 1fr);

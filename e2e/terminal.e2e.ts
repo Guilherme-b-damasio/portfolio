@@ -179,3 +179,14 @@ test("a second ask sends the first turn as a follow-up, and ask --new forgets it
   expect(bodies[1].history).toEqual([{ question: "o que é o docsage?", answer: "resposta 1" }]);
   expect(bodies[2]).toEqual({ question: "outra coisa" });
 });
+
+test("/evals scores the real index and a question opens in the terminal", async ({ home }) => {
+  await home.goto("/#/evals");
+  const page = home.locator("#page-evals");
+  await expect(page.locator("#evals-stats")).toContainText("recall@3");
+  await expect(page.locator("#evals-state")).toContainText("engine local");
+  expect(await page.locator("#evals-rows tr").count()).toBeGreaterThanOrEqual(20);
+
+  await page.getByRole("button", { name: "o que é o docsage?" }).click();
+  await expect(home.locator("#term-out")).toContainText("mostrando só a recuperação");
+});
