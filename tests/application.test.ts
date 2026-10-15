@@ -104,7 +104,10 @@ describe("AskQuestion", () => {
 describe("AskQuestion --xray", () => {
   const hits = (n: number): Hit[] =>
     Array.from({ length: n }, (_, i) => ({ ...hit, chunk: { ...hit.chunk, source: `s${i}` }, score: 10 - i }));
-  const prompting: Answerer = { ...echoAnswerer, prompt: (q, p) => ({ system: "sys", user: `${p.length}:${q}` }) };
+  const prompting: Answerer = {
+    ...echoAnswerer,
+    prompt: (q, p) => ({ system: "sys", history: [], user: `${p.length}:${q}` }),
+  };
   const prices = { priceOf: (m: string) => (m === "fake" ? { inputPerMTok: 4, outputPerMTok: 20 } : null) };
 
   it("ranks more candidates than it keeps and marks which ones reached the LLM", async () => {
@@ -118,7 +121,7 @@ describe("AskQuestion --xray", () => {
     expect(result.passages).toHaveLength(2);
     expect(result.xray!.terms).toEqual(["como", "funciona"]);
     expect(result.xray!.ranking.map((r) => r.kept)).toEqual([true, true, false, false, false, false]);
-    expect(result.xray!.prompt).toEqual({ system: "sys", user: "2:como funciona" });
+    expect(result.xray!.prompt).toEqual({ system: "sys", history: [], user: "2:como funciona" });
   });
 
   it("times the generation and prices it", async () => {
@@ -213,5 +216,38 @@ describe("ReportStatus", () => {
     expect(report.prometheus()).toMatch(/^x 1\n/);
     expect(report.prometheus()).toMatch(/^portfolio_llm_tokens_used_today 250$/m);
     expect(report.prometheus()).toMatch(/^portfolio_llm_tokens_daily_limit 1000$/m);
+  });
+});
+
+describe("AskQuestion follow-ups", () => {
+  const turn = (n: number) => ({ question: `q${n}`, answer: `a${n}` });
+
+  it("retrieves with the previous question as context and hands the turns to the LLM", async () => {
+    const retriever = fixedRetriever([hit]);
+    let received: unknown;
+    const answerer: Answerer = {
+      model: "fake",
+      answer: async (_q, _p, { history } = {}) => ((received = history), { text: "", inputTokens: 0, outputTokens: 0 }),
+    };
+    await new AskQuestion(retriever, answerer).execute("e a stack?", { history: [turn(1), turn(2)] });
+
+    expect(retriever.calls[0][0]).toBe("q2 e a stack?");
+    expect(received).toEqual([turn(1), turn(2)]);
+  });
+
+  it("keeps only the newest turns, and none when follow-ups are off", async () => {
+    let received: unknown;
+    const answerer: Answerer = {
+      model: "fake",
+      answer: async (_q, _p, { history } = {}) => ((received = history), { text: "", inputTokens: 0, outputTokens: 0 }),
+    };
+    const history = [turn(1), turn(2), turn(3), turn(4)];
+    await new AskQuestion(fixedRetriever([hit]), answerer, { maxTurns: 2 }).execute("p", { history });
+    expect(received).toEqual([turn(3), turn(4)]);
+
+    const retriever = fixedRetriever([hit]);
+    await new AskQuestion(retriever, answerer, { maxTurns: 0 }).execute("p", { history });
+    expect(received).toEqual([]);
+    expect(retriever.calls[0][0]).toBe("p");
   });
 });

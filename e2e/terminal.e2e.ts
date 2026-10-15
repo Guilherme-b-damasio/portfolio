@@ -136,3 +136,37 @@ test("ask --xray prices a replayed generation and shows the exact prompt", async
   await prompt.locator("summary").click();
   await expect(prompt.locator("pre")).toContainText("Pergunta: rag?");
 });
+
+test("a second ask sends the first turn as a follow-up, and ask --new forgets it", async ({ home }) => {
+  const bodies: { question: string; history?: { question: string; answer: string }[] }[] = [];
+  const passage = { chunk: { id: "a#0", source: "docsage.md › O que é", text: "RAG" }, score: 2, matchedTerms: [] };
+  await home.route("**/api/ask", (route) => {
+    const body = route.request().postDataJSON();
+    bodies.push(body);
+    const done = {
+      answer: `resposta ${bodies.length}`,
+      passages: [passage],
+      model: "claude-test",
+      usage: { inputTokens: 1, outputTokens: 1 },
+      latencyMs: { retrieval: 1, generation: 1 },
+      degraded: null,
+    };
+    return route.fulfill({
+      status: 200,
+      headers: { "content-type": "text/event-stream", "x-ratelimit-remaining": "4", "x-ratelimit-limit": "5" },
+      body: `event: done\ndata: ${JSON.stringify(done)}\n\n`,
+    });
+  });
+  const out = home.locator("#term-out");
+  await run(home, 'ask "o que é o docsage?"');
+  await expect(out).toContainText("resposta 1");
+  await run(home, 'ask "e a stack?"');
+  await expect(out).toContainText("resposta 2");
+  await expect(out).toContainText("follow-up: levo a pergunta anterior junto");
+  await run(home, 'ask --new "outra coisa"');
+  await expect(out).toContainText("resposta 3");
+
+  expect(bodies[0]).not.toHaveProperty("history");
+  expect(bodies[1].history).toEqual([{ question: "o que é o docsage?", answer: "resposta 1" }]);
+  expect(bodies[2]).toEqual({ question: "outra coisa" });
+});

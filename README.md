@@ -51,6 +51,7 @@ still start with `TODO` are left out of the index.
 | `POST /api/ask`           | `{ question }`, 5 per client, refills 5/min; 503 + `Retry-After` when `ASK_MAX_CONCURRENCY` are already running |
 | `POST /api/ask` + `Accept: text/event-stream` | Same limits, streamed: `passages` (BM25 hits and timing), `text` (each piece of the answer), then `done` (the full JSON result) or `error` |
 | `POST /api/ask` with `xray: true` | Same answer plus `xray`: the query terms, the BM25 ranking with the runners-up the LLM did not get, the exact prompt, time to first token, tokens/s and an estimated cost (`src/infrastructure/llm/anthropic-price-list.ts`). `ask --xray` in the terminal |
+| `POST /api/ask` with `history` | A follow-up: up to 3 earlier `{ question, answer }` turns (answers ≤ 1500 chars), kept by the browser only. The previous question joins the BM25 query; the turns go to Claude before the newest question. `ask --new` in the terminal starts over |
 | `GET /api/ask/quota`      | The caller's remaining questions, without spending one |
 | `GET /api/skills`         | Skill groups with where each one shows up (`content/skills.md`) |
 | `GET /api/contact`        | Whether the contact form is on |

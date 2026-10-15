@@ -44,7 +44,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 - [x] Streaming SSE no `/api/ask` (`text/event-stream`), com os tokens aparecendo no terminal enquanto são gerados
 - [x] `ask --xray`: mostra as etapas (tokenização → ranking BM25 com scores → prompt montado → geração
       com tokens/s e custo estimado em US$)
-- [ ] Follow-up: conversa com memória curta guardada no cliente e enviada ao servidor com limite de tamanho
+- [x] Follow-up: conversa com memória curta guardada no cliente e enviada ao servidor com limite de tamanho
 - [x] Citações clicáveis que rodam `cat <projeto>` e rolam até a seção
 - [ ] `HttpRetriever` para o docsage, com fallback para o BM25 local. `ask --engine docsage|local`
 - [ ] Eval do RAG: ~20 perguntas com a fonte esperada e recall@3 calculado no CI (falha se cair)

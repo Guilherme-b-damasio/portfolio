@@ -26,6 +26,14 @@ export function takeFlag(args, flag) {
   return { on: rest.length !== args.length, rest };
 }
 
+/**
+ * Adds a turn to the short conversation memory the terminal sends with follow-ups: only the
+ * newest `max` turns, each answer cut to what the server accepts.
+ */
+export function rememberTurn(turns, { question, answer }, { max = 3, answerChars = 1500 } = {}) {
+  return [...turns, { question, answer: answer.slice(0, answerChars) }].slice(-max);
+}
+
 /** A score as a bar of `width` cells, relative to the best score of the ranking. */
 export function scoreBar(score, best, width = 12) {
   const filled = best > 0 ? Math.max(1, Math.round((score / best) * width)) : 0;

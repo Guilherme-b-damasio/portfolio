@@ -70,6 +70,20 @@ describe("ClaudeAnswerer", () => {
     expect(calls[0].params.messages).toEqual([{ role: "user", content: user }]);
   });
 
+  it("replays earlier turns as plain messages and puts passages only on the newest question", async () => {
+    const { client, calls } = fakeClient(["ok"]);
+    const answerer = new ClaudeAnswerer(client, "m");
+    const history = [{ question: "o que é o docsage?", answer: "Um RAG [docsage.md › O que é]." }];
+    await answerer.answer("e a stack?", [hit], { history });
+
+    expect(calls[0].params.messages).toEqual([
+      { role: "user", content: "o que é o docsage?" },
+      { role: "assistant", content: "Um RAG [docsage.md › O que é]." },
+      { role: "user", content: answerer.prompt("e a stack?", [hit]).user },
+    ]);
+    expect(answerer.prompt("e a stack?", [hit], history).history).toBe(history);
+  });
+
   it("replaces a refused answer with a fixed line", async () => {
     const { client } = fakeClient(["meio"], "refusal");
     expect((await new ClaudeAnswerer(client, "m").answer("oi?", [hit])).text).toBe(REFUSAL_TEXT);
