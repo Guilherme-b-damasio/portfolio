@@ -7,12 +7,14 @@ import type { BrowseTlsSamples } from "../../application/browse-tls-samples.js";
 import type { InspectVisitor } from "../../application/inspect-visitor.js";
 import type { ReportStatus } from "../../application/report-status.js";
 import type { SendContact } from "../../application/send-contact.js";
+import type { ShowEvals } from "../../application/show-evals.js";
 import type { Logger } from "../../domain/logger.js";
 import type { TappedConnections } from "../../domain/tls.js";
 import { concurrencyCap, ConcurrencyGate } from "../middleware/concurrency.js";
 import { rateLimit, TokenBucket } from "../middleware/rate-limit.js";
 import { openEventStream } from "../sse.js";
 import { contactRouter } from "./contact.js";
+import { evalsRouter } from "./evals.js";
 import { scanRouter } from "./scan.js";
 
 export interface ApiDeps {
@@ -26,6 +28,7 @@ export interface ApiDeps {
   askLimit?: { capacity: number; refillPerMinute: number };
   askConcurrency?: number; // questions answered at once, across every visitor
   askTimeoutMs?: number; // generation is aborted past this, streamed or not
+  showEvals?: ShowEvals | null; // the retrieval eval at /api/evals; off without an eval set
 }
 
 // A follow-up carries the last turns from the browser. Capped here so a visitor cannot inflate the prompt.
@@ -68,6 +71,7 @@ export function apiRouter(
     tapped,
     tlsSamples,
     askTimeoutMs = 60_000,
+    showEvals,
   }: ApiDeps,
   logger: Logger,
   { bucket: askBucket, gate: askGate }: AskGuards,
@@ -173,6 +177,7 @@ export function apiRouter(
   });
 
   api.use("/contact", contactRouter(sendContact, logger));
+  if (showEvals) api.use("/evals", evalsRouter(showEvals));
   api.use("/scan", scanRouter(inspectVisitor, tapped ?? null, tlsSamples ?? null));
 
   return api;
