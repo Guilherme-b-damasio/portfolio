@@ -39,6 +39,8 @@ export interface AskResult {
   usage: { inputTokens: number; outputTokens: number } | null;
   latencyMs: { retrieval: number; generation: number | null };
   degraded: "token-budget" | null; // why an LLM that is on did not answer, so the terminal can say it
+  engine: string; // the retriever that found the passages ("local" is the BM25 in this process)
+  engineFallback: string | null; // why the engine the visitor asked for was not the one used
   xray?: AskXray; // only when the visitor asked to see the steps
 }
 
