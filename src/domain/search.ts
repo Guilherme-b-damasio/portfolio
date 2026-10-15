@@ -16,3 +16,8 @@ export interface Retriever {
   /** The query as the index sees it, for the x-ray. Retrievers that cannot say leave it out. */
   terms?(query: string): string[];
 }
+
+/** A retriever that could not search right now. Its message is written for the visitor, so it names no host. */
+export class RetrieverUnavailable extends Error {
+  override name = "RetrieverUnavailable";
+}

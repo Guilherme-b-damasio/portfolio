@@ -3,6 +3,7 @@ import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { RetrieverUnavailable } from "../src/domain/search.js";
 import { citation, DocsageRetriever } from "../src/infrastructure/search/docsage-retriever.js";
 
 // A stand-in for docsage's MCP server: same tool name, arguments and structured output.
@@ -74,7 +75,7 @@ describe("DocsageRetriever", () => {
     const docsage = fakeDocsage(() => (broken ? { nope: true } : { query: "q", results: [] }));
     const retriever = new DocsageRetriever(docsage.connect);
 
-    await expect(retriever.search("a")).rejects.toThrow();
+    await expect(retriever.search("a")).rejects.toThrow("formato que não reconheço");
     broken = false;
     await expect(retriever.search("a")).resolves.toEqual([]);
     expect(docsage.connections()).toBe(2);
@@ -84,6 +85,15 @@ describe("DocsageRetriever", () => {
     const docsage = fakeDocsage(() => new Promise(() => {}));
     const retriever = new DocsageRetriever(docsage.connect, { timeoutMs: 50 });
     await expect(retriever.search("a")).rejects.toThrow("docsage não respondeu em 50 ms");
+  });
+
+  it("reports any other failure without its details, which could name the host", async () => {
+    const retriever = new DocsageRetriever(async () => {
+      throw new Error("connect ECONNREFUSED 10.0.0.7:8765");
+    });
+    const failure = await retriever.search("a").catch((err: unknown) => err);
+    expect(failure).toBeInstanceOf(RetrieverUnavailable);
+    expect((failure as Error).message).toBe("docsage está fora do ar");
   });
 
   it("gives up when it cannot even connect", async () => {

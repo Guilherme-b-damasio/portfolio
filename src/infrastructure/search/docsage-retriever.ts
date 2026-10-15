@@ -1,6 +1,6 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { z } from "zod";
-import type { Hit, Retriever } from "../../domain/search.js";
+import { type Hit, type Retriever, RetrieverUnavailable } from "../../domain/search.js";
 
 // What docsage's `search_documents` tool returns as structured content (docsage/interfaces/serializers.py).
 const searchOutput = z.object({
@@ -40,8 +40,10 @@ export class DocsageRetriever implements Retriever {
         signal,
         timeout: this.timeoutMs,
       });
-      if (result.isError) throw new Error("docsage recusou a busca");
-      const { results } = searchOutput.parse(result.structuredContent);
+      if (result.isError) throw new RetrieverUnavailable("docsage recusou a busca");
+      const parsed = searchOutput.safeParse(result.structuredContent);
+      if (!parsed.success) throw new RetrieverUnavailable("docsage respondeu num formato que não reconheço");
+      const { results } = parsed.data;
       return results.map(({ score, matched_terms, chunk }) => ({
         chunk: { id: `docsage:${chunk.id}`, source: citation(chunk.source, chunk.section), text: chunk.text },
         score: Number(score.toFixed(3)),
@@ -49,7 +51,10 @@ export class DocsageRetriever implements Retriever {
       }));
     } catch (err) {
       this.reset();
-      throw signal.aborted ? new Error(`docsage não respondeu em ${this.timeoutMs} ms`) : err;
+      if (signal.aborted) throw new RetrieverUnavailable(`docsage não respondeu em ${this.timeoutMs} ms`);
+      throw err instanceof RetrieverUnavailable
+        ? err
+        : new RetrieverUnavailable("docsage está fora do ar", { cause: err });
     }
   }
 
