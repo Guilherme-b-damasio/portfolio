@@ -11,10 +11,17 @@ export interface AnswerOptions {
   signal?: AbortSignal; // aborts generation, e.g. when the visitor closes the stream
 }
 
+/** Exactly what the LLM is sent, so the x-ray can show it. */
+export interface Prompt {
+  system: string;
+  user: string;
+}
+
 /** Turns a question plus retrieved passages into a written answer. */
 export interface Answerer {
   readonly model: string;
   answer(question: string, passages: Hit[], options?: AnswerOptions): Promise<Generation>;
+  prompt?(question: string, passages: Hit[]): Prompt;
 }
 
 export interface AskResult {
