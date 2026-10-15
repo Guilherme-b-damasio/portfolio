@@ -19,6 +19,8 @@ back (`docsage.md` accepts any of its sections, `docsage.md › Decisões técni
 `npm run eval` runs them through the real index and prints where the first expected source landed,
 recall@3 and MRR; CI runs it and `tests/rag-eval.test.ts` fails the build when recall drops below the
 set's `minRecall`. Misses stay in the set on purpose: they are what the next change to the index has to fix.
+The `/evals` page (`#/evals`, `GET /api/evals?engine=local|docsage`) runs the same set against the index
+the pod is serving; each engine is scored at most once every 10 minutes, whoever asks.
 
 Content lives in `content/` as Markdown: `profile.md` plus one file per project in
 `content/projects/`. Each `## ` heading becomes one searchable chunk; sections that
@@ -66,6 +68,7 @@ still start with `TODO` are left out of the index.
 | `POST /api/ask` with `history` | A follow-up: up to 3 earlier `{ question, answer }` turns (answers ≤ 1500 chars), kept by the browser only. The previous question joins the BM25 query; the turns go to Claude before the newest question. `ask --new` in the terminal starts over |
 | `POST /api/ask` with `engine` | `"local"` (default, BM25 in this process) or `"docsage"`, searched through docsage's `search_documents` MCP tool. When docsage is off, slow or down the local index answers and `engineFallback` says why; the reply's `engine` is the one that searched. `ask --engine docsage` in the terminal |
 | `GET /api/ask/engines`    | The engines this server can search with      |
+| `GET /api/evals?engine=`  | recall@3, MRR and every question of `data/evals/rag.json` against that engine, cached 10 min; an engine that is down comes back as `{ error }` |
 | `GET /api/ask/quota`      | The caller's remaining questions, without spending one |
 | `GET /api/skills`         | Skill groups with where each one shows up (`content/skills.md`) |
 | `GET /api/contact`        | Whether the contact form is on |
