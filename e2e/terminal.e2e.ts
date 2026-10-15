@@ -87,3 +87,52 @@ test("ask renders a streamed answer with clickable citations", async ({ home }) 
   await expect(answer.getByRole("button", { name: "docsage.md › O que é" })).toBeVisible();
   await expect(home.locator("#term-out .t-meta").last()).toContainText("40→9 tokens");
 });
+
+test("ask --xray shows the real tokenization and BM25 ranking", async ({ home }) => {
+  await run(home, 'ask --xray "como funciona o docsage?"');
+  const out = home.locator("#term-out");
+  await expect(out).toContainText("── raio-x ──");
+  await expect(out.locator(".t-token").first()).toHaveText("funciona");
+  await expect(out).toContainText(/ranking BM25\s+\d+ candidatos, \d+ vão para o prompt/);
+  await expect(out).toContainText("sem LLM neste ambiente");
+});
+
+test("ask --xray prices a replayed generation and shows the exact prompt", async ({ home }) => {
+  const passage = {
+    chunk: { id: "a#0", source: "docsage.md › O que é", text: "RAG" },
+    score: 2,
+    matchedTerms: ["rag"],
+  };
+  const done = {
+    answer: "É um RAG.",
+    passages: [passage],
+    model: "claude-test",
+    usage: { inputTokens: 1200, outputTokens: 300 },
+    latencyMs: { retrieval: 1, generation: 3000 },
+    degraded: null,
+    xray: {
+      terms: ["rag"],
+      ranking: [
+        { source: "docsage.md › O que é", score: 2, matchedTerms: ["rag"], kept: true },
+        { source: "docsage.md › Stack", score: 0.5, matchedTerms: ["rag"], kept: false },
+      ],
+      prompt: { system: "Você responde perguntas", user: "<trecho>RAG</trecho>\n\nPergunta: rag?" },
+      generation: { firstTokenMs: 800, tokensPerSecond: 100, costUsd: 0.0108 },
+    },
+  };
+  await home.route("**/api/ask", (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { "content-type": "text/event-stream", "x-ratelimit-remaining": "4", "x-ratelimit-limit": "5" },
+      body: `event: done\ndata: ${JSON.stringify(done)}\n\n`,
+    }),
+  );
+  await run(home, 'ask --xray "rag?"');
+  const out = home.locator("#term-out");
+  await expect(out.locator(".t-cut")).toContainText("docsage.md › Stack");
+  await expect(out).toContainText("100 tokens/s");
+  await expect(out).toContainText("~US$ 0.0108");
+  const prompt = out.locator(".t-prompt");
+  await prompt.locator("summary").click();
+  await expect(prompt.locator("pre")).toContainText("Pergunta: rag?");
+});
