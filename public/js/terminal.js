@@ -6,12 +6,15 @@ import {
   commandForSource,
   formatMs,
   formatUptime,
+  formatUsd,
   guessCommand,
   highlightParts,
   PAGES,
   parseLine,
   scanHeadline,
+  scoreBar,
   sections,
+  takeFlag,
   VERDICTS,
 } from "./lib.js";
 
@@ -92,13 +95,14 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ["ls projects", "lista os projetos"],
         ["cat <projeto>", "detalhes de um projeto"],
         ['ask "<pergunta>"', "pergunta ao RAG sobre mim"],
+        ['ask --xray "<pergunta>"', "a mesma pergunta, mostrando cada etapa"],
         ["status", "métricas ao vivo deste servidor"],
         ["scan", "o que este site sabe sobre você"],
         ["curl <caminho>", "chama a API crua, ex: curl /api/profile"],
         ["open <página>", OPENABLE.join(" · ")],
         ["clear", "limpa a tela"],
       ];
-      print(...rows.map(([c, d]) => line([acc(c.padEnd(20)), dim(d)])));
+      print(...rows.map(([c, d]) => line([acc(c.padEnd(24)), dim(d)])));
     },
 
     async whoami() {
@@ -154,8 +158,9 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
     },
 
     async ask(args) {
-      const question = args.join(" ");
-      if (!question) return say(warn("! "), 'uso: ask "sua pergunta"');
+      const { on: xray, rest } = takeFlag(args, "--xray");
+      const question = rest.join(" ");
+      if (!question) return say(warn("! "), 'uso: ask [--xray] "sua pergunta"');
 
       let loading = line([acc("·   "), dim("buscando trechos…")]);
       print(loading);
@@ -186,7 +191,11 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
       try {
         response = await apiStream(
           "/api/ask",
-          { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ question }) },
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(xray ? { question, xray } : { question }),
+          },
           onEvent,
         );
       } catch {
@@ -220,7 +229,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
           line([warn("! 503 "), body.error]),
           line([
             dim(`teto global de perguntas simultâneas; sua ficha não foi gasta. espere ~${retry}s e `),
-            runButton("tente de novo", `ask "${question.replaceAll('"', "")}"`),
+            runButton("tente de novo", `ask ${xray ? "--xray " : ""}"${question.replaceAll('"', "")}"`),
           ]),
         );
       }
@@ -287,6 +296,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
       }
       parts.push(`total ${formatMs(ms)}`, `rate limit restante ${remaining}`);
       print(line([dim(parts.join(" · "))], "t-meta"));
+      if (body.xray) printXray(body);
     },
 
     async status() {
@@ -358,6 +368,77 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
     },
   };
 
+  // ---------- ask --xray: each step the answer went through ----------
+  function printXray({ xray, model, usage, latencyMs, degraded }) {
+    const step = (n, title, detail = "") => line([acc(`${n} ${title}`), dim(detail ? `  ${detail}` : "")], "t-gap");
+    print(line([bold("── raio-x ──")], "t-gap"));
+
+    print(step(1, "tokenização", "a pergunta como o índice a lê: minúsculas, sem acento, sem stopwords"));
+    if (xray.terms) say(...xray.terms.flatMap((t) => [text(t, "t-token"), " "]));
+    else say(dim("este recuperador não expõe os termos"));
+
+    const kept = xray.ranking.filter((r) => r.kept).length;
+    print(step(2, "ranking BM25", `${xray.ranking.length} candidatos, ${kept} vão para o prompt`));
+    const best = xray.ranking[0]?.score ?? 0;
+    for (const r of xray.ranking) {
+      print(
+        line(
+          [
+            r.kept ? acc("✓ ") : dim("· "),
+            text(scoreBar(r.score, best), r.kept ? "t-acc" : "t-dim"),
+            dim(` ${r.score.toFixed(2).padStart(6)}  `),
+            cite(r.source, commandForSource(r.source)),
+            dim(r.matchedTerms.length ? `  [${r.matchedTerms.join(", ")}]` : ""),
+          ],
+          r.kept ? "" : "t-cut",
+        ),
+      );
+    }
+    if (!xray.ranking.length) say(dim("nenhum trecho com score acima de zero"));
+
+    if (!xray.prompt) {
+      print(step(3, "prompt"), line([dim("sem LLM neste ambiente: não há prompt")]));
+      return;
+    }
+    const size = xray.prompt.system.length + xray.prompt.user.length;
+    print(step(3, "prompt montado", `${size} caracteres`));
+    const details = el(
+      "details",
+      { class: "t-prompt" },
+      el("summary", {}, "ver o prompt exato"),
+      el(
+        "pre",
+        {},
+        `# system
+${xray.prompt.system}
+
+# user
+${xray.prompt.user}`,
+      ),
+    );
+    print(details);
+
+    if (!xray.generation) {
+      print(
+        step(4, "geração"),
+        line([dim(degraded === "token-budget" ? "não enviado: o orçamento diário acabou" : "não houve geração")]),
+      );
+      return;
+    }
+    const g = xray.generation;
+    const parts = [model];
+    if (g.firstTokenMs != null) parts.push(`1º token em ${formatMs(g.firstTokenMs)}`);
+    parts.push(
+      `${g.tokensPerSecond.toFixed(0)} tokens/s`,
+      `${usage.inputTokens}→${usage.outputTokens} tokens em ${formatMs(latencyMs.generation)}`,
+    );
+    print(step(4, "geração"), line([parts.join(" · ")]));
+    say(
+      g.costUsd != null ? acc(`~${formatUsd(g.costUsd)}`) : dim("custo: preço do modelo desconhecido"),
+      dim(g.costUsd != null ? "  estimado pela tabela de preços (inclui tokens de raciocínio)" : ""),
+    );
+  }
+
   function failed(status) {
     print(
       line([warn(status ? `! erro ${status} ` : "! sem resposta "), "A API não respondeu."]),
@@ -419,7 +500,9 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
               ? ["projects"]
               : words[0] === "open"
                 ? OPENABLE
-                : [];
+                : words[0] === "ask" && words.length === 2
+                  ? ["--xray"]
+                  : [];
       const matches = pool.filter((c) => c.startsWith(words[words.length - 1]));
       if (!matches.length) return;
       if (matches.length === 1) {

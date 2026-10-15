@@ -27,7 +27,7 @@ export interface ApiDeps {
   askTimeoutMs?: number; // generation is aborted past this, streamed or not
 }
 
-const askBody = z.object({ question: z.string().trim().min(2).max(500) });
+const askBody = z.object({ question: z.string().trim().min(2).max(500), xray: z.boolean().optional() });
 
 /** The ask bucket is shared with the MCP `ask` tool, so both doors spend the same questions. */
 export function askBucketFor({ askLimit }: Pick<ApiDeps, "askLimit">): TokenBucket {
@@ -102,11 +102,11 @@ export function apiRouter(
       clearTimeout(timer);
       abort.abort();
     });
-    const question = parsed.data.question;
+    const { question, xray } = parsed.data;
 
     if (!req.get("accept")?.includes("text/event-stream")) {
       try {
-        res.json(await askQuestion.execute(question, { signal: abort.signal }));
+        res.json(await askQuestion.execute(question, { signal: abort.signal, xray }));
       } catch (err) {
         next(err);
       }
@@ -119,6 +119,7 @@ export function apiRouter(
         onPassages: (passages, retrievalMs) => stream.send("passages", { passages, retrievalMs }),
         onText: (delta) => stream.send("text", { delta }),
         signal: abort.signal,
+        xray,
       });
       stream.send("done", result);
     } catch (err) {

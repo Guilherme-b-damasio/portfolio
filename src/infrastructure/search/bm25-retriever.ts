@@ -39,8 +39,12 @@ export class Bm25Retriever implements Retriever {
     this.avgLength = this.docs.reduce((sum, d) => sum + d.length, 0) / Math.max(this.docs.length, 1);
   }
 
+  terms(query: string): string[] {
+    return [...new Set(tokenize(query))];
+  }
+
   search(query: string, k = 4): Hit[] {
-    const queryTerms = [...new Set(tokenize(query))];
+    const queryTerms = this.terms(query);
     const n = this.docs.length;
 
     return this.docs

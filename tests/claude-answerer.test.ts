@@ -59,6 +59,17 @@ describe("ClaudeAnswerer", () => {
     expect((await new ClaudeAnswerer(client, "m").answer("oi?", [hit])).text).toBe("ok");
   });
 
+  it("sends exactly the prompt it shows to the x-ray", async () => {
+    const { client, calls } = fakeClient(["ok"]);
+    const answerer = new ClaudeAnswerer(client, "m");
+    await answerer.answer("oi?", [hit]);
+    const { system, user } = answerer.prompt("oi?", [hit]);
+
+    expect(user).toBe('<trecho fonte="a.md › Intro">\ntexto\n</trecho>\n\nPergunta: oi?');
+    expect(calls[0].params.system).toBe(system);
+    expect(calls[0].params.messages).toEqual([{ role: "user", content: user }]);
+  });
+
   it("replaces a refused answer with a fixed line", async () => {
     const { client } = fakeClient(["meio"], "refusal");
     expect((await new ClaudeAnswerer(client, "m").answer("oi?", [hit])).text).toBe(REFUSAL_TEXT);

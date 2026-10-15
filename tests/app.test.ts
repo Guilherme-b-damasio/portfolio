@@ -50,6 +50,11 @@ describe("search", () => {
     expect(sources.filter((s) => s.startsWith("docsage.md")).length).toBeGreaterThan(1);
   });
 
+  it("shows the query as the index sees it: folded, without stopwords, deduplicated", () => {
+    const retriever = new Bm25Retriever(chunkContent(content));
+    expect(retriever.terms("Como funciona a Busca? busca BM25")).toEqual(["funciona", "busca", "bm25"]);
+  });
+
   it("returns nothing for unrelated questions", () => {
     const retriever = new Bm25Retriever(chunkContent(content));
     expect(retriever.search("receita de bolo de cenoura")).toEqual([]);
