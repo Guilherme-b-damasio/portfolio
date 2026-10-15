@@ -1,6 +1,7 @@
 import express from "express";
 import { z } from "zod";
 import type { AskQuestion } from "../../application/ask-question.js";
+import type { AskResult } from "../../domain/answer.js";
 import type { BrowsePortfolio } from "../../application/browse-portfolio.js";
 import type { BrowseTlsSamples } from "../../application/browse-tls-samples.js";
 import type { InspectVisitor } from "../../application/inspect-visitor.js";
@@ -34,6 +35,11 @@ const askBody = z.object({
   question: z.string().trim().min(2).max(500),
   xray: z.boolean().optional(),
   history: z.array(turn).max(MAX_TURNS).optional(),
+  // Unknown names are not an error: the use case answers with the local index and says why.
+  engine: z
+    .string()
+    .regex(/^[a-z]{1,20}$/)
+    .optional(),
 });
 
 /** The ask bucket is shared with the MCP `ask` tool, so both doors spend the same questions. */
@@ -95,12 +101,17 @@ export function apiRouter(
     res.json(askBucket.peek(req.ip ?? "unknown"));
   });
 
+  // Which retrieval engines `ask --engine` can pick on this server.
+  api.get("/ask/engines", (_req, res) => {
+    res.json({ engines: askQuestion.engineNames });
+  });
+
   // The gate runs first, so a visitor turned away because the server is busy keeps their token.
   api.post("/ask", concurrencyCap(askGate), rateLimit(askBucket), async (req, res, next) => {
     const parsed = askBody.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({
-        error: `Envie { question } com 2 a 500 caracteres e, num follow-up, no máximo ${MAX_TURNS} turnos em history.`,
+        error: `Envie { question } com 2 a 500 caracteres, um engine opcional e, num follow-up, no máximo ${MAX_TURNS} turnos em history.`,
       });
       return;
     }
@@ -111,11 +122,20 @@ export function apiRouter(
       clearTimeout(timer);
       abort.abort();
     });
-    const { question, xray, history } = parsed.data;
+    const { question, xray, history, engine } = parsed.data;
+    const logFallback = (result: AskResult) => {
+      if (result.engineFallback)
+        logger.info("ask fell back to the local index", {
+          requestId: res.locals.requestId,
+          engine,
+          reason: result.engineFallback,
+        });
+      return result;
+    };
 
     if (!req.get("accept")?.includes("text/event-stream")) {
       try {
-        res.json(await askQuestion.execute(question, { signal: abort.signal, xray, history }));
+        res.json(logFallback(await askQuestion.execute(question, { signal: abort.signal, xray, history, engine })));
       } catch (err) {
         next(err);
       }
@@ -130,8 +150,9 @@ export function apiRouter(
         signal: abort.signal,
         xray,
         history,
+        engine,
       });
-      stream.send("done", result);
+      stream.send("done", logFallback(result));
     } catch (err) {
       // Once the stream is open the status is already 200, so failures travel as an event.
       if (!res.destroyed) {
