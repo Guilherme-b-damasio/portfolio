@@ -110,6 +110,29 @@ describe("POST /api/ask as an event stream", () => {
     expect(xray.data.xray.generation.firstTokenMs).toBeGreaterThanOrEqual(0);
   });
 
+  it("hands a follow-up's earlier turns to the LLM", async () => {
+    let received: unknown;
+    const remembering: Answerer = {
+      model: "fake",
+      answer: async (_q, _p, { history } = {}) => (
+        (received = history),
+        { text: "ok", inputTokens: 1, outputTokens: 1 }
+      ),
+    };
+    const history = [{ question: "o que é o docsage?", answer: "Um RAG." }];
+    const res = await askStream(await start(remembering), { history });
+    await res.text();
+    expect(received).toEqual(history);
+  });
+
+  it("refuses a history longer or wordier than the cap", async () => {
+    const base = await start(streaming);
+    const turn = { question: "pergunta", answer: "resposta" };
+    expect((await askStream(base, { history: [turn, turn, turn, turn] })).status).toBe(400);
+    expect((await askStream(base, { history: [{ ...turn, answer: "x".repeat(1501) }] })).status).toBe(400);
+    expect((await askStream(base, { history: [turn, turn, turn] })).status).toBe(200);
+  });
+
   it("rejects an x-ray flag that is not a boolean", async () => {
     expect((await askStream(await start(streaming), { xray: "sim" })).status).toBe(400);
   });

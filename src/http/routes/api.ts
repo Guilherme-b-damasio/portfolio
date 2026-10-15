@@ -27,7 +27,14 @@ export interface ApiDeps {
   askTimeoutMs?: number; // generation is aborted past this, streamed or not
 }
 
-const askBody = z.object({ question: z.string().trim().min(2).max(500), xray: z.boolean().optional() });
+// A follow-up carries the last turns from the browser. Capped here so a visitor cannot inflate the prompt.
+export const MAX_TURNS = 3;
+const turn = z.object({ question: z.string().trim().min(2).max(500), answer: z.string().max(1500) });
+const askBody = z.object({
+  question: z.string().trim().min(2).max(500),
+  xray: z.boolean().optional(),
+  history: z.array(turn).max(MAX_TURNS).optional(),
+});
 
 /** The ask bucket is shared with the MCP `ask` tool, so both doors spend the same questions. */
 export function askBucketFor({ askLimit }: Pick<ApiDeps, "askLimit">): TokenBucket {
@@ -92,7 +99,9 @@ export function apiRouter(
   api.post("/ask", concurrencyCap(askGate), rateLimit(askBucket), async (req, res, next) => {
     const parsed = askBody.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: "Envie { question: string } com 2 a 500 caracteres." });
+      res.status(400).json({
+        error: `Envie { question } com 2 a 500 caracteres e, num follow-up, no máximo ${MAX_TURNS} turnos em history.`,
+      });
       return;
     }
     // A visitor who leaves or a generation that runs too long stops spending tokens right away.
@@ -102,11 +111,11 @@ export function apiRouter(
       clearTimeout(timer);
       abort.abort();
     });
-    const { question, xray } = parsed.data;
+    const { question, xray, history } = parsed.data;
 
     if (!req.get("accept")?.includes("text/event-stream")) {
       try {
-        res.json(await askQuestion.execute(question, { signal: abort.signal, xray }));
+        res.json(await askQuestion.execute(question, { signal: abort.signal, xray, history }));
       } catch (err) {
         next(err);
       }
@@ -120,6 +129,7 @@ export function apiRouter(
         onText: (delta) => stream.send("text", { delta }),
         signal: abort.signal,
         xray,
+        history,
       });
       stream.send("done", result);
     } catch (err) {

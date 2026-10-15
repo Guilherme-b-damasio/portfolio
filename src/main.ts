@@ -11,6 +11,7 @@ import { scanChecks } from "./application/scan/checks/index.js";
 import { ReportStatus } from "./application/report-status.js";
 import { SendContact } from "./application/send-contact.js";
 import { createApp } from "./http/app.js";
+import { MAX_TURNS } from "./http/routes/api.js";
 import { MarkdownContentSource } from "./infrastructure/content/markdown-content-source.js";
 import { JsonLogger } from "./infrastructure/logging/json-logger.js";
 import { AnthropicPriceList } from "./infrastructure/llm/anthropic-price-list.js";
@@ -52,7 +53,7 @@ const tap = certFile && keyFile ? new TlsTap({ proxyProtocol: process.env.TLS_PR
 
 const app = createApp({
   browse: new BrowsePortfolio(content),
-  askQuestion: new AskQuestion(retriever, answerer, { budget, prices: new AnthropicPriceList() }),
+  askQuestion: new AskQuestion(retriever, answerer, { budget, prices: new AnthropicPriceList(), maxTurns: MAX_TURNS }),
   reportStatus: new ReportStatus(metrics, answerer?.model ?? null, history, budget),
   sendContact: new SendContact(mailer),
   inspectVisitor: new InspectVisitor(scanChecks(), new DnsReverseLookup()),
