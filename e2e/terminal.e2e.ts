@@ -185,6 +185,8 @@ test("/evals scores the real index and a question opens in the terminal", async 
   const page = home.locator("#page-evals");
   await expect(page.locator("#evals-stats")).toContainText("recall@3");
   await expect(page.locator("#evals-state")).toContainText("engine local");
+  // Only the local engine on this server, so there is nothing to switch between.
+  await expect(page.locator("#evals-engines")).toBeHidden();
   expect(await page.locator("#evals-rows tr").count()).toBeGreaterThanOrEqual(20);
 
   await page.getByRole("button", { name: "o que é o docsage?" }).click();

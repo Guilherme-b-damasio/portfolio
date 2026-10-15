@@ -1392,6 +1392,9 @@ a:hover {
   border-radius: var(--radius-md);
   overflow: hidden;
 }
+.seg-tabs[hidden] {
+  display: none;
+}
 .seg-tabs button {
   min-height: 40px;
   padding: 0 16px;
