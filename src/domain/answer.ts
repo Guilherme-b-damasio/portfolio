@@ -31,4 +31,17 @@ export interface AskResult {
   usage: { inputTokens: number; outputTokens: number } | null;
   latencyMs: { retrieval: number; generation: number | null };
   degraded: "token-budget" | null; // why an LLM that is on did not answer, so the terminal can say it
+  xray?: AskXray; // only when the visitor asked to see the steps
+}
+
+/** Every step of an answer, for `ask --xray`: what the index saw, how it ranked, what the LLM got and what it cost. */
+export interface AskXray {
+  terms: string[] | null; // null when the retriever cannot say how it reads the query
+  ranking: { source: string; score: number; matchedTerms: string[]; kept: boolean }[]; // kept = sent to the LLM
+  prompt: Prompt | null; // null without an LLM
+  generation: {
+    firstTokenMs: number | null; // from the request to the first written word, thinking included
+    tokensPerSecond: number;
+    costUsd: number | null; // null when the model has no known price
+  } | null; // null when nothing was generated
 }

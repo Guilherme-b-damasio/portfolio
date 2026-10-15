@@ -101,6 +101,57 @@ describe("AskQuestion", () => {
   });
 });
 
+describe("AskQuestion --xray", () => {
+  const hits = (n: number): Hit[] =>
+    Array.from({ length: n }, (_, i) => ({ ...hit, chunk: { ...hit.chunk, source: `s${i}` }, score: 10 - i }));
+  const prompting: Answerer = { ...echoAnswerer, prompt: (q, p) => ({ system: "sys", user: `${p.length}:${q}` }) };
+  const prices = { priceOf: (m: string) => (m === "fake" ? { inputPerMTok: 4, outputPerMTok: 20 } : null) };
+
+  it("ranks more candidates than it keeps and marks which ones reached the LLM", async () => {
+    const retriever = { ...fixedRetriever(hits(6)), terms: (q: string) => q.split(" ") };
+    const result = await new AskQuestion(retriever, prompting, { topK: 2, xrayCandidates: 5, prices }).execute(
+      "como funciona",
+      { xray: true },
+    );
+
+    expect(retriever.calls).toEqual([["como funciona", 5]]);
+    expect(result.passages).toHaveLength(2);
+    expect(result.xray!.terms).toEqual(["como", "funciona"]);
+    expect(result.xray!.ranking.map((r) => r.kept)).toEqual([true, true, false, false, false, false]);
+    expect(result.xray!.prompt).toEqual({ system: "sys", user: "2:como funciona" });
+  });
+
+  it("times the generation and prices it", async () => {
+    const result = await new AskQuestion(fixedRetriever([hit]), prompting, { prices }).execute("p", { xray: true });
+    const generation = result.xray!.generation!;
+    // 7 in at $4/M + 3 out at $20/M
+    expect(generation.costUsd).toBeCloseTo(0.000088, 10);
+    expect(generation.tokensPerSecond).toBeGreaterThan(0);
+    expect(generation.firstTokenMs).toBeNull(); // the echo answerer never streams
+  });
+
+  it("records when the first word came out", async () => {
+    const streaming: Answerer = {
+      model: "other",
+      answer: async (_q, _p, { onText } = {}) => (onText?.("x"), { text: "x", inputTokens: 1, outputTokens: 1 }),
+    };
+    const result = await new AskQuestion(fixedRetriever([hit]), streaming, { prices }).execute("p", { xray: true });
+    expect(result.xray!.generation!.firstTokenMs).toBeGreaterThanOrEqual(0);
+    expect(result.xray!.generation!.costUsd).toBeNull(); // no price for "other"
+  });
+
+  it("still explains retrieval when nothing is generated, and stays out of plain answers", async () => {
+    const off = await new AskQuestion(fixedRetriever([hit]), null).execute("p", { xray: true });
+    expect(off.xray).toEqual({
+      terms: null,
+      ranking: [{ source: "a.md › Intro", score: 1.2, matchedTerms: ["texto"], kept: true }],
+      prompt: null,
+      generation: null,
+    });
+    expect(await new AskQuestion(fixedRetriever([hit]), echoAnswerer).execute("p")).not.toHaveProperty("xray");
+  });
+});
+
 describe("BrowsePortfolio", () => {
   const content: Content = {
     profile: { name: "N", handle: "n", role: "dev", links: {}, body: "" },
