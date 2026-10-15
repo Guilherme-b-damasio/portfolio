@@ -32,6 +32,7 @@ still start with `TODO` are left out of the index.
 | `LLM_DAILY_TOKEN_BUDGET` | `200000`    | LLM tokens (input + output) per UTC day; past it `/api/ask` returns only the passages, with `degraded: "token-budget"`, until 00:00 UTC |
 | `TLS_CERT_FILE`, `TLS_KEY_FILE` | unset | Also serve HTTPS on `TLS_PORT` (default `8443`) and fingerprint each visitor's TLS handshake. Re-read every 6 h |
 | `TLS_PROXY_PROTOCOL` | unset | `1` when that port sits behind a TCP passthrough that sends the PROXY protocol; the header then becomes mandatory |
+| `ASK_RATE_PER_MINUTE` | `5`             | Questions per visitor: a bucket of this size that refills at this rate per minute (HTTP and MCP share it) |
 | `ASK_MAX_CONCURRENCY` | `4`             | Questions answered at once across every visitor (HTTP and MCP); above it, 503 with `Retry-After` |
 | `ASK_TIMEOUT_MS`    | `60000`           | Generation for one question is aborted past this; a visitor who disconnects aborts it too |
 | `DOCSAGE_MCP_URL`  | unset             | docsage's MCP endpoint (Streamable HTTP, e.g. `http://docsage:8765/mcp`). Turns on `ask --engine docsage` |

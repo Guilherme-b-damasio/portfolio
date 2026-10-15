@@ -24,7 +24,8 @@ export default defineConfig({
   webServer: {
     command: "npx tsx src/main.ts",
     url: `http://127.0.0.1:${port}/healthz`,
-    env: { PORT: String(port), ANTHROPIC_API_KEY: "", RESEND_API_KEY: "" },
+    // Every test asks from the same address, so the per-visitor question bucket is widened for the run.
+    env: { PORT: String(port), ANTHROPIC_API_KEY: "", RESEND_API_KEY: "", ASK_RATE_PER_MINUTE: "60" },
     reuseExistingServer: !process.env.CI,
     timeout: 60_000,
   },

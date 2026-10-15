@@ -58,6 +58,7 @@ const mailer =
   process.env.RESEND_API_KEY && process.env.CONTACT_TO
     ? new ResendMailer(process.env.RESEND_API_KEY, process.env.CONTACT_TO, process.env.CONTACT_FROM)
     : null;
+const askRate = Number(process.env.ASK_RATE_PER_MINUTE ?? 5);
 const metrics = new InMemoryMetrics();
 const history = new SampledHistory(metrics);
 const stopSampling = history.start();
@@ -84,6 +85,8 @@ const app = createApp({
   metrics,
   logger,
   publicDir: path.join(root, "public"),
+  // Questions per visitor: a bucket this size that refills at the same rate per minute.
+  askLimit: { capacity: askRate, refillPerMinute: askRate },
   askConcurrency: Number(process.env.ASK_MAX_CONCURRENCY ?? 4),
   askTimeoutMs: Number(process.env.ASK_TIMEOUT_MS ?? 60_000),
   // The same questions CI scores, run against the index this pod is actually serving.
