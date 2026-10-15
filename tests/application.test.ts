@@ -218,3 +218,36 @@ describe("ReportStatus", () => {
     expect(report.prometheus()).toMatch(/^portfolio_llm_tokens_daily_limit 1000$/m);
   });
 });
+
+describe("AskQuestion follow-ups", () => {
+  const turn = (n: number) => ({ question: `q${n}`, answer: `a${n}` });
+
+  it("retrieves with the previous question as context and hands the turns to the LLM", async () => {
+    const retriever = fixedRetriever([hit]);
+    let received: unknown;
+    const answerer: Answerer = {
+      model: "fake",
+      answer: async (_q, _p, { history } = {}) => ((received = history), { text: "", inputTokens: 0, outputTokens: 0 }),
+    };
+    await new AskQuestion(retriever, answerer).execute("e a stack?", { history: [turn(1), turn(2)] });
+
+    expect(retriever.calls[0][0]).toBe("q2 e a stack?");
+    expect(received).toEqual([turn(1), turn(2)]);
+  });
+
+  it("keeps only the newest turns, and none when follow-ups are off", async () => {
+    let received: unknown;
+    const answerer: Answerer = {
+      model: "fake",
+      answer: async (_q, _p, { history } = {}) => ((received = history), { text: "", inputTokens: 0, outputTokens: 0 }),
+    };
+    const history = [turn(1), turn(2), turn(3), turn(4)];
+    await new AskQuestion(fixedRetriever([hit]), answerer, { maxTurns: 2 }).execute("p", { history });
+    expect(received).toEqual([turn(3), turn(4)]);
+
+    const retriever = fixedRetriever([hit]);
+    await new AskQuestion(retriever, answerer, { maxTurns: 0 }).execute("p", { history });
+    expect(received).toEqual([]);
+    expect(retriever.calls[0][0]).toBe("p");
+  });
+});
