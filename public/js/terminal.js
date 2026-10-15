@@ -314,7 +314,8 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
       }
 
       const { retrieval, generation } = body.latencyMs;
-      const parts = [`${body.engine === "local" ? "bm25" : body.engine} ${formatMs(retrieval)}`];
+      const searchedWith = body.engine && body.engine !== "local" ? body.engine : "bm25";
+      const parts = [`${searchedWith} ${formatMs(retrieval)}`];
       if (generation != null) {
         parts.push(
           `${body.model} ${formatMs(generation)}`,
