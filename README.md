@@ -25,6 +25,8 @@ still start with `TODO` are left out of the index.
 | `TLS_PROXY_PROTOCOL` | unset | `1` when that port sits behind a TCP passthrough that sends the PROXY protocol; the header then becomes mandatory |
 | `ASK_MAX_CONCURRENCY` | `4`             | Questions answered at once across every visitor (HTTP and MCP); above it, 503 with `Retry-After` |
 | `ASK_TIMEOUT_MS`    | `60000`           | Generation for one question is aborted past this; a visitor who disconnects aborts it too |
+| `DOCSAGE_MCP_URL`  | unset             | docsage's MCP endpoint (Streamable HTTP, e.g. `http://docsage:8765/mcp`). Turns on `ask --engine docsage` |
+| `DOCSAGE_TIMEOUT_MS` | `2000`          | One docsage search, connection included; past it the question is answered from the local index |
 | `GIT_SHA`, `BUILT_AT` | `dev`           | Shown in the footer and `/api/status` (set as Docker build args) |
 | `RESEND_API_KEY`, `CONTACT_TO` | unset | Turn on the contact form; messages go to `CONTACT_TO` through Resend |
 | `CONTACT_FROM`      | `onboarding@resend.dev` | Sender shown in the e-mail (needs a verified domain on Resend to change) |
@@ -52,6 +54,8 @@ still start with `TODO` are left out of the index.
 | `POST /api/ask` + `Accept: text/event-stream` | Same limits, streamed: `passages` (BM25 hits and timing), `text` (each piece of the answer), then `done` (the full JSON result) or `error` |
 | `POST /api/ask` with `xray: true` | Same answer plus `xray`: the query terms, the BM25 ranking with the runners-up the LLM did not get, the exact prompt, time to first token, tokens/s and an estimated cost (`src/infrastructure/llm/anthropic-price-list.ts`). `ask --xray` in the terminal |
 | `POST /api/ask` with `history` | A follow-up: up to 3 earlier `{ question, answer }` turns (answers ≤ 1500 chars), kept by the browser only. The previous question joins the BM25 query; the turns go to Claude before the newest question. `ask --new` in the terminal starts over |
+| `POST /api/ask` with `engine` | `"local"` (default, BM25 in this process) or `"docsage"`, searched through docsage's `search_documents` MCP tool. When docsage is off, slow or down the local index answers and `engineFallback` says why; the reply's `engine` is the one that searched. `ask --engine docsage` in the terminal |
+| `GET /api/ask/engines`    | The engines this server can search with      |
 | `GET /api/ask/quota`      | The caller's remaining questions, without spending one |
 | `GET /api/skills`         | Skill groups with where each one shows up (`content/skills.md`) |
 | `GET /api/contact`        | Whether the contact form is on |
