@@ -26,6 +26,7 @@
           <a href="#/mcp" data-page="mcp"><span>03</span>mcp</a>
           <a href="#/contato" data-page="contato"><span>04</span>contato</a>
           <a href="#/voce" data-page="voce"><span>05</span>você</a>
+          <a href="#/evals" data-page="evals"><span>06</span>evals</a>
         </nav>
         <button type="button" id="theme" class="icon-btn" aria-label="Mudar o tema"></button>
       </header>
@@ -310,6 +311,52 @@
               <p>Dois dos meus projetos falam MCP.</p>
             </div>
             <div class="grid grid-frame servers" id="mcp-servers"></div>
+          </section>
+        </div>
+
+        <div id="page-evals" hidden>
+          <section class="page-hero" aria-labelledby="pg-evals">
+            <p class="eyebrow">/evals</p>
+            <h1 id="pg-evals">Evals</h1>
+            <p class="lede">
+              As perguntas que o CI faz ao RAG a cada push, rodadas agora contra o índice que este servidor está
+              servindo. Mede só a busca: a fonte certa voltou entre os 3 primeiros trechos? Os erros ficam à mostra.
+            </p>
+          </section>
+
+          <section class="block" aria-labelledby="t-eval-score">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>01</span>
+                <h2 id="t-eval-score">Placar</h2>
+              </div>
+              <p class="mono muted small" id="evals-state" aria-live="polite"></p>
+            </div>
+            <div class="seg-tabs" id="evals-engines" role="tablist" aria-label="Engine" hidden></div>
+            <div class="grid grid-frame stats" id="evals-stats"></div>
+          </section>
+
+          <section class="block" aria-labelledby="t-eval-cases">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>02</span>
+                <h2 id="t-eval-cases">Pergunta por pergunta</h2>
+              </div>
+              <p>Clique numa pergunta para fazê-la no terminal.</p>
+            </div>
+            <div class="table-wrap">
+              <table class="data evals-table">
+                <thead>
+                  <tr>
+                    <th scope="col">pergunta e fonte</th>
+                    <th scope="col">posição</th>
+                  </tr>
+                </thead>
+                <tbody id="evals-rows"></tbody>
+              </table>
+            </div>
           </section>
         </div>
 

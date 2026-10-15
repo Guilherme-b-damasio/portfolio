@@ -167,7 +167,7 @@ export function commandForSource(source) {
   return section ? `cat ${slug} "${section}"` : `cat ${slug}`;
 }
 
-export const PAGES = ["inicio", "sobre", "projetos", "mcp", "contato", "voce"];
+export const PAGES = ["inicio", "sobre", "projetos", "mcp", "contato", "voce", "evals"];
 
 /** "#/projetos/docsage" → { page: "projetos", param: "docsage" }. Plain anchors like "#terminal" stay on the home page. */
 export function parseRoute(hash) {

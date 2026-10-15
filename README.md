@@ -19,6 +19,8 @@ back (`docsage.md` accepts any of its sections, `docsage.md › Decisões técni
 `npm run eval` runs them through the real index and prints where the first expected source landed,
 recall@3 and MRR; CI runs it and `tests/rag-eval.test.ts` fails the build when recall drops below the
 set's `minRecall`. Misses stay in the set on purpose: they are what the next change to the index has to fix.
+The `/evals` page (`#/evals`, `GET /api/evals?engine=local|docsage`) runs the same set against the index
+the pod is serving; each engine is scored at most once every 10 minutes, whoever asks.
 
 Content lives in `content/` as Markdown: `profile.md` plus one file per project in
 `content/projects/`. Each `## ` heading becomes one searchable chunk; sections that
@@ -32,6 +34,7 @@ still start with `TODO` are left out of the index.
 | `LLM_DAILY_TOKEN_BUDGET` | `200000`    | LLM tokens (input + output) per UTC day; past it `/api/ask` returns only the passages, with `degraded: "token-budget"`, until 00:00 UTC |
 | `TLS_CERT_FILE`, `TLS_KEY_FILE` | unset | Also serve HTTPS on `TLS_PORT` (default `8443`) and fingerprint each visitor's TLS handshake. Re-read every 6 h |
 | `TLS_PROXY_PROTOCOL` | unset | `1` when that port sits behind a TCP passthrough that sends the PROXY protocol; the header then becomes mandatory |
+| `ASK_RATE_PER_MINUTE` | `5`             | Questions per visitor: a bucket of this size that refills at this rate per minute (HTTP and MCP share it) |
 | `ASK_MAX_CONCURRENCY` | `4`             | Questions answered at once across every visitor (HTTP and MCP); above it, 503 with `Retry-After` |
 | `ASK_TIMEOUT_MS`    | `60000`           | Generation for one question is aborted past this; a visitor who disconnects aborts it too |
 | `DOCSAGE_MCP_URL`  | unset             | docsage's MCP endpoint (Streamable HTTP, e.g. `http://docsage:8765/mcp`). Turns on `ask --engine docsage` |
@@ -65,6 +68,7 @@ still start with `TODO` are left out of the index.
 | `POST /api/ask` with `history` | A follow-up: up to 3 earlier `{ question, answer }` turns (answers ≤ 1500 chars), kept by the browser only. The previous question joins the BM25 query; the turns go to Claude before the newest question. `ask --new` in the terminal starts over |
 | `POST /api/ask` with `engine` | `"local"` (default, BM25 in this process) or `"docsage"`, searched through docsage's `search_documents` MCP tool. When docsage is off, slow or down the local index answers and `engineFallback` says why; the reply's `engine` is the one that searched. `ask --engine docsage` in the terminal |
 | `GET /api/ask/engines`    | The engines this server can search with      |
+| `GET /api/evals?engine=`  | recall@3, MRR and every question of `data/evals/rag.json` against that engine, cached 10 min; an engine that is down comes back as `{ error }` |
 | `GET /api/ask/quota`      | The caller's remaining questions, without spending one |
 | `GET /api/skills`         | Skill groups with where each one shows up (`content/skills.md`) |
 | `GET /api/contact`        | Whether the contact form is on |

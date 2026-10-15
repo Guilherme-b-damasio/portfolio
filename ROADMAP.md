@@ -48,7 +48,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 - [x] Citações clicáveis que rodam `cat <projeto>` e rolam até a seção
 - [x] `HttpRetriever` para o docsage, com fallback para o BM25 local. `ask --engine docsage|local`
 - [x] Eval do RAG: ~20 perguntas com a fonte esperada e recall@3 calculado no CI (falha se cair)
-- [ ] Página `/evals` com o resultado do último eval
+- [x] Página `/evals` com o resultado do último eval
 - [ ] Stemming leve em português no BM25: o eval erra "como você trabalha em time?" porque `trabalha` ≠ `trabalho`.
       Subir o `minRecall` junto
 - [ ] **[dono]** docsage rodando como serviço no cluster

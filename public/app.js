@@ -3,6 +3,7 @@ import { createDiagram } from "./js/diagram.js";
 import { el, icon } from "./js/dom.js";
 import { createLivePanel } from "./js/live.js";
 import { createContatoPage } from "./js/pages/contato.js";
+import { createEvalsPage } from "./js/pages/evals.js";
 import { createMcpPage } from "./js/pages/mcp.js";
 import { createProjetosPage } from "./js/pages/projetos.js";
 import { createSobrePage } from "./js/pages/sobre.js";
@@ -187,6 +188,7 @@ const router = createRouter({
     mcp: createMcpPage({ root: $("page-mcp") }),
     contato: createContatoPage({ root: $("page-contato") }),
     voce: createVocePage({ root: $("page-voce") }),
+    evals: createEvalsPage({ root: $("page-evals"), act }),
   },
 });
 
