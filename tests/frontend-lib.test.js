@@ -22,6 +22,7 @@ import {
   sections,
   sparkPoints,
   takeFlag,
+  takeOption,
 } from "../public/js/lib.js";
 
 describe("ask --xray helpers", () => {
@@ -29,6 +30,15 @@ describe("ask --xray helpers", () => {
     expect(takeFlag(["--xray", "o que é?"], "--xray")).toEqual({ on: true, rest: ["o que é?"] });
     expect(takeFlag(["o", "que", "--xray"], "--xray")).toEqual({ on: true, rest: ["o", "que"] });
     expect(takeFlag(["o que é?"], "--xray")).toEqual({ on: false, rest: ["o que é?"] });
+  });
+
+  it("pulls an option and its value out wherever it was typed", () => {
+    expect(takeOption(["--engine", "docsage", "o que é?"], "--engine")).toEqual({
+      value: "docsage",
+      rest: ["o que é?"],
+    });
+    expect(takeOption(["o que é?", "--engine"], "--engine")).toEqual({ value: "", rest: ["o que é?"] });
+    expect(takeOption(["o que é?"], "--engine")).toEqual({ value: null, rest: ["o que é?"] });
   });
 
   it("keeps four decimals under a dollar", () => {

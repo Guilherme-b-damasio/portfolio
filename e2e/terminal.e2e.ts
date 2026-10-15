@@ -40,6 +40,15 @@ test("ask answers from the real index and spends one question", async ({ home })
   await expect(home.locator("#bucket-count")).toHaveText(/^\d+\/\d+$/);
 });
 
+test("ask --engine docsage says docsage is off here and answers from the local index", async ({ home }) => {
+  // No DOCSAGE_MCP_URL in this run, so the real server falls back and says why.
+  await run(home, 'ask --engine docsage "o que é o docsage?"');
+  const out = home.locator("#term-out");
+  await expect(out).toContainText("docsage não está ligado neste servidor; busquei no índice local.");
+  await expect(out.locator(".t-hit").first()).toBeVisible();
+  await expect(out.locator(".t-meta").last()).toContainText("bm25");
+});
+
 test("status reports the live process", async ({ home }) => {
   await run(home, "status");
   const out = home.locator("#term-out");

@@ -26,6 +26,13 @@ export function takeFlag(args, flag) {
   return { on: rest.length !== args.length, rest };
 }
 
+/** Pulls a `--option value` pair out of a command's arguments: { value, rest }. A dangling option has value "". */
+export function takeOption(args, option) {
+  const i = args.indexOf(option);
+  if (i === -1) return { value: null, rest: args };
+  return { value: args[i + 1] ?? "", rest: [...args.slice(0, i), ...args.slice(i + 2)] };
+}
+
 /**
  * Adds a turn to the short conversation memory the terminal sends with follow-ups: only the
  * newest `max` turns, each answer cut to what the server accepts.

@@ -46,7 +46,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
       com tokens/s e custo estimado em US$)
 - [x] Follow-up: conversa com memória curta guardada no cliente e enviada ao servidor com limite de tamanho
 - [x] Citações clicáveis que rodam `cat <projeto>` e rolam até a seção
-- [ ] `HttpRetriever` para o docsage, com fallback para o BM25 local. `ask --engine docsage|local`
+- [x] `HttpRetriever` para o docsage, com fallback para o BM25 local. `ask --engine docsage|local`
 - [ ] Eval do RAG: ~20 perguntas com a fonte esperada e recall@3 calculado no CI (falha se cair)
 - [ ] Página `/evals` com o resultado do último eval
 - [ ] **[dono]** docsage rodando como serviço no cluster

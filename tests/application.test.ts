@@ -5,7 +5,7 @@ import { ReportStatus } from "../src/application/report-status.js";
 import type { Answerer } from "../src/domain/answer.js";
 import type { Content } from "../src/domain/content.js";
 import type { MetricsHistory, MetricsSnapshot, MetricsStore } from "../src/domain/metrics.js";
-import type { Hit, Retriever } from "../src/domain/search.js";
+import { type Hit, type Retriever, RetrieverUnavailable } from "../src/domain/search.js";
 import { DailyTokenBudget } from "../src/infrastructure/llm/daily-token-budget.js";
 
 const hit: Hit = {
@@ -249,5 +249,60 @@ describe("AskQuestion follow-ups", () => {
     await new AskQuestion(retriever, answerer, { maxTurns: 0 }).execute("p", { history });
     expect(received).toEqual([]);
     expect(retriever.calls[0][0]).toBe("p");
+  });
+});
+
+describe("AskQuestion engines", () => {
+  const other: Hit = { ...hit, chunk: { ...hit.chunk, id: "docsage:1" } };
+  const failing = (err: Error): Retriever => ({
+    search: () => {
+      throw err;
+    },
+  });
+
+  it("searches with the local index unless told otherwise, and lists the engines it has", async () => {
+    const ask = new AskQuestion(fixedRetriever([hit]), null, { engines: { docsage: fixedRetriever([other]) } });
+    expect(ask.engineNames).toEqual(["local", "docsage"]);
+    expect(await ask.execute("p")).toMatchObject({ passages: [hit], engine: "local", engineFallback: null });
+  });
+
+  it("searches with the engine the visitor picked", async () => {
+    const docsage = fixedRetriever([other]);
+    const ask = new AskQuestion(fixedRetriever([hit]), null, { topK: 3, engines: { docsage } });
+    const result = await ask.execute("p", { engine: "docsage" });
+    expect(docsage.calls).toEqual([["p", 3]]);
+    expect(result).toMatchObject({ passages: [other], engine: "docsage", engineFallback: null });
+  });
+
+  it("falls back to the local index with the reason when the engine fails", async () => {
+    const ask = new AskQuestion(fixedRetriever([hit]), echoAnswerer, {
+      engines: { docsage: failing(new RetrieverUnavailable("docsage não respondeu em 2000 ms")) },
+    });
+    const result = await ask.execute("p", { engine: "docsage" });
+    expect(result).toMatchObject({
+      passages: [hit],
+      answer: "p (1)",
+      engine: "local",
+      engineFallback: "docsage não respondeu em 2000 ms",
+    });
+  });
+
+  it("never repeats the message of an unexpected error", async () => {
+    const ask = new AskQuestion(fixedRetriever([hit]), null, {
+      engines: { docsage: failing(new Error("connect ECONNREFUSED 10.0.0.7")) },
+    });
+    expect((await ask.execute("p", { engine: "docsage" })).engineFallback).toBe("docsage falhou");
+  });
+
+  it("says when the engine is not configured on this server", async () => {
+    const result = await new AskQuestion(fixedRetriever([hit]), null).execute("p", { engine: "docsage" });
+    expect(result).toMatchObject({ engine: "local", engineFallback: "docsage não está ligado neste servidor" });
+  });
+
+  it("reads the query terms from the engine that answered", async () => {
+    const docsage = { ...fixedRetriever([other]), terms: () => ["docsage-terms"] };
+    const local = { ...fixedRetriever([hit]), terms: () => ["local-terms"] };
+    const ask = new AskQuestion(local, null, { engines: { docsage } });
+    expect((await ask.execute("p", { engine: "docsage", xray: true })).xray?.terms).toEqual(["docsage-terms"]);
   });
 });

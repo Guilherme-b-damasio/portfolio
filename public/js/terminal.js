@@ -16,6 +16,7 @@ import {
   scoreBar,
   sections,
   takeFlag,
+  takeOption,
   VERDICTS,
 } from "./lib.js";
 
@@ -99,6 +100,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ['ask "<pergunta>"', "pergunta ao RAG sobre mim"],
         ['ask --xray "<pergunta>"', "a mesma pergunta, mostrando cada etapa"],
         ['ask --new "<pergunta>"', "esquece a conversa e começa outra"],
+        ['ask --engine docsage "<pergunta>"', "busca no docsage em vez do índice local"],
         ["status", "métricas ao vivo deste servidor"],
         ["scan", "o que este site sabe sobre você"],
         ["curl <caminho>", "chama a API crua, ex: curl /api/profile"],
@@ -162,9 +164,11 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
 
     async ask(args) {
       const { on: xray, rest: withoutXray } = takeFlag(args, "--xray");
-      const { on: fresh, rest } = takeFlag(withoutXray, "--new");
+      const { on: fresh, rest: withoutNew } = takeFlag(withoutXray, "--new");
+      const { value: engine, rest } = takeOption(withoutNew, "--engine");
       const question = rest.join(" ");
-      if (!question) return say(warn("! "), 'uso: ask [--xray] [--new] "sua pergunta"');
+      if (!question || engine === "")
+        return say(warn("! "), 'uso: ask [--xray] [--new] [--engine docsage|local] "sua pergunta"');
       if (fresh) conversation = [];
       const history = conversation;
       if (history.length) {
@@ -208,6 +212,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
               question,
               ...(xray && { xray }),
               ...(history.length && { history }),
+              ...(engine && { engine: engine.toLowerCase() }),
             }),
           },
           onEvent,
@@ -243,7 +248,10 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
           line([warn("! 503 "), body.error]),
           line([
             dim(`teto global de perguntas simultâneas; sua ficha não foi gasta. espere ~${retry}s e `),
-            runButton("tente de novo", `ask ${xray ? "--xray " : ""}"${question.replaceAll('"', "")}"`),
+            runButton(
+              "tente de novo",
+              `ask ${xray ? "--xray " : ""}${engine ? `--engine ${engine} ` : ""}"${question.replaceAll('"', "")}"`,
+            ),
           ]),
         );
       }
@@ -255,6 +263,10 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         // The stream broke after it opened: keep what was written and say it stopped.
         if (!streamed) loading.remove();
         return say(warn("! "), body.error);
+      }
+
+      if (body.engineFallback) {
+        loading.before(line([warn("! "), `${body.engineFallback}; busquei no índice local.`]));
       }
 
       if (!body.passages.length) {
@@ -302,7 +314,8 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
       }
 
       const { retrieval, generation } = body.latencyMs;
-      const parts = [`bm25 ${formatMs(retrieval)}`];
+      const searchedWith = body.engine && body.engine !== "local" ? body.engine : "bm25";
+      const parts = [`${searchedWith} ${formatMs(retrieval)}`];
       if (generation != null) {
         parts.push(
           `${body.model} ${formatMs(generation)}`,
@@ -517,8 +530,10 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
               : words[0] === "open"
                 ? OPENABLE
                 : words[0] === "ask" && words.length === 2
-                  ? ["--xray", "--new"]
-                  : [];
+                  ? ["--xray", "--new", "--engine"]
+                  : words[0] === "ask" && words[words.length - 2] === "--engine"
+                    ? ["docsage", "local"]
+                    : [];
       const matches = pool.filter((c) => c.startsWith(words[words.length - 1]));
       if (!matches.length) return;
       if (matches.length === 1) {

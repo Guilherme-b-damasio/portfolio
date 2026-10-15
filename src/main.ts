@@ -1,4 +1,6 @@
 import { readFileSync } from "node:fs";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import https from "node:https";
 import type { Server } from "node:net";
 import path from "node:path";
@@ -25,6 +27,7 @@ import { TlsTap } from "./infrastructure/tls/tls-tap.js";
 import { SampledHistory } from "./infrastructure/metrics/sampled-history.js";
 import { Bm25Retriever } from "./infrastructure/search/bm25-retriever.js";
 import { chunkContent } from "./infrastructure/search/chunker.js";
+import { DocsageRetriever } from "./infrastructure/search/docsage-retriever.js";
 
 // The only composition root: every adapter is built here and injected into the use cases.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -32,6 +35,18 @@ const port = Number(process.env.PORT ?? 3000);
 
 const content = await new MarkdownContentSource(process.env.CONTENT_DIR ?? path.join(root, "content")).load();
 const retriever = new Bm25Retriever(chunkContent(content));
+// docsage's MCP server (Streamable HTTP) as a second engine for `ask --engine docsage`; off when unset.
+const docsageUrl = process.env.DOCSAGE_MCP_URL;
+const docsage = docsageUrl
+  ? new DocsageRetriever(
+      async () => {
+        const client = new Client({ name: "portfolio", version: "0.1.0" });
+        await client.connect(new StreamableHTTPClientTransport(new URL(docsageUrl)));
+        return client;
+      },
+      { timeoutMs: Number(process.env.DOCSAGE_TIMEOUT_MS ?? 2_000) },
+    )
+  : null;
 // Without a key the chat still works: it returns the retrieved passages instead of a generated answer.
 const answerer = process.env.ANTHROPIC_API_KEY ? new ClaudeAnswerer() : null;
 // Past this many tokens in a UTC day, answers fall back to the retrieved passages until midnight.
@@ -53,7 +68,12 @@ const tap = certFile && keyFile ? new TlsTap({ proxyProtocol: process.env.TLS_PR
 
 const app = createApp({
   browse: new BrowsePortfolio(content),
-  askQuestion: new AskQuestion(retriever, answerer, { budget, prices: new AnthropicPriceList(), maxTurns: MAX_TURNS }),
+  askQuestion: new AskQuestion(retriever, answerer, {
+    budget,
+    prices: new AnthropicPriceList(),
+    maxTurns: MAX_TURNS,
+    engines: docsage ? { docsage } : {},
+  }),
   reportStatus: new ReportStatus(metrics, answerer?.model ?? null, history, budget),
   sendContact: new SendContact(mailer),
   inspectVisitor: new InspectVisitor(scanChecks(), new DnsReverseLookup()),
@@ -71,6 +91,7 @@ const server = app.listen(port, () => {
     port,
     projects: content.projects.length,
     llm: answerer?.model ?? "off",
+    docsage: docsage ? "on" : "off",
     contact: mailer ? "on" : "off",
   });
 });
