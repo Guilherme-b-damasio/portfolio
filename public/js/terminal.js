@@ -11,6 +11,7 @@ import {
   highlightParts,
   PAGES,
   parseLine,
+  rememberTurn,
   scanHeadline,
   scoreBar,
   sections,
@@ -35,6 +36,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
   let historyIndex = 0;
   let quota = null; // { remaining, limit, refillPerMinute, at }
   let busy = false;
+  let conversation = []; // last turns with a generated answer, sent with the next ask as a follow-up
 
   // ---------- output ----------
   function line(segments, cls) {
@@ -96,6 +98,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ["cat <projeto>", "detalhes de um projeto"],
         ['ask "<pergunta>"', "pergunta ao RAG sobre mim"],
         ['ask --xray "<pergunta>"', "a mesma pergunta, mostrando cada etapa"],
+        ['ask --new "<pergunta>"', "esquece a conversa e começa outra"],
         ["status", "métricas ao vivo deste servidor"],
         ["scan", "o que este site sabe sobre você"],
         ["curl <caminho>", "chama a API crua, ex: curl /api/profile"],
@@ -158,9 +161,16 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
     },
 
     async ask(args) {
-      const { on: xray, rest } = takeFlag(args, "--xray");
+      const { on: xray, rest: withoutXray } = takeFlag(args, "--xray");
+      const { on: fresh, rest } = takeFlag(withoutXray, "--new");
       const question = rest.join(" ");
-      if (!question) return say(warn("! "), 'uso: ask [--xray] "sua pergunta"');
+      if (!question) return say(warn("! "), 'uso: ask [--xray] [--new] "sua pergunta"');
+      if (fresh) conversation = [];
+      const history = conversation;
+      if (history.length) {
+        const carried = history.length === 1 ? "a pergunta anterior" : `as últimas ${history.length} perguntas`;
+        say(dim(`follow-up: levo ${carried} junto · ask --new recomeça`));
+      }
 
       let loading = line([acc("·   "), dim("buscando trechos…")]);
       print(loading);
@@ -194,7 +204,11 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
           {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify(xray ? { question, xray } : { question }),
+            body: JSON.stringify({
+              question,
+              ...(xray && { xray }),
+              ...(history.length && { history }),
+            }),
           },
           onEvent,
         );
@@ -254,6 +268,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
       }
 
       if (body.answer) {
+        conversation = rememberTurn(conversation, { question, answer: body.answer });
         const parts = citationParts(body.answer).map((p) =>
           p.source ? cite(p.text, commandForSource(p.source)) : p.text,
         );
@@ -365,6 +380,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
 
     clear() {
       out.replaceChildren();
+      conversation = [];
     },
   };
 
@@ -409,11 +425,11 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
       el(
         "pre",
         {},
-        `# system
-${xray.prompt.system}
-
-# user
-${xray.prompt.user}`,
+        [
+          `# system\n${xray.prompt.system}`,
+          ...(xray.prompt.history ?? []).flatMap((t) => [`# user\n${t.question}`, `# assistant\n${t.answer}`]),
+          `# user\n${xray.prompt.user}`,
+        ].join("\n\n"),
       ),
     );
     print(details);
@@ -501,7 +517,7 @@ ${xray.prompt.user}`,
               : words[0] === "open"
                 ? OPENABLE
                 : words[0] === "ask" && words.length === 2
-                  ? ["--xray"]
+                  ? ["--xray", "--new"]
                   : [];
       const matches = pool.filter((c) => c.startsWith(words[words.length - 1]));
       if (!matches.length) return;

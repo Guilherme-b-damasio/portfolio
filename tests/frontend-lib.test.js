@@ -15,6 +15,7 @@ import {
   ja4Parts,
   parseLine,
   parseSse,
+  rememberTurn,
   routeLabel,
   scanHeadline,
   scoreBar,
@@ -39,6 +40,15 @@ describe("ask --xray helpers", () => {
     expect(scoreBar(4, 4, 4)).toBe("████");
     expect(scoreBar(2, 4, 4)).toBe("██░░");
     expect(scoreBar(0.01, 4, 4)).toBe("█░░░");
+  });
+});
+
+describe("follow-up memory", () => {
+  it("keeps the newest turns and trims long answers to what the server accepts", () => {
+    let turns = [];
+    for (const n of [1, 2, 3, 4]) turns = rememberTurn(turns, { question: `q${n}`, answer: `a${n}` });
+    expect(turns.map((t) => t.question)).toEqual(["q2", "q3", "q4"]);
+    expect(rememberTurn([], { question: "q", answer: "x".repeat(2000) })[0].answer).toHaveLength(1500);
   });
 });
 
