@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { AnswerOptions, Answerer, Generation, Prompt } from "../../domain/answer.js";
+import type { AnswerOptions, Answerer, Generation, Prompt, Turn } from "../../domain/answer.js";
 import type { Hit } from "../../domain/search.js";
 
 const SYSTEM_PROMPT = `Você responde perguntas sobre o portfólio de um desenvolvedor, em nome dele, no site pessoal.
@@ -15,13 +15,22 @@ export class ClaudeAnswerer implements Answerer {
     readonly model = process.env.CLAUDE_MODEL ?? "claude-opus-5-5",
   ) {}
 
-  prompt(question: string, passages: Hit[]): Prompt {
+  prompt(question: string, passages: Hit[], history: Turn[] = []): Prompt {
     const context = passages.map((p) => `<trecho fonte="${p.chunk.source}">\n${p.chunk.text}\n</trecho>`).join("\n");
-    return { system: SYSTEM_PROMPT, user: `${context}\n\nPergunta: ${question}` };
+    // Only the newest question carries passages: earlier turns are the plain conversation.
+    return { system: SYSTEM_PROMPT, history, user: `${context}\n\nPergunta: ${question}` };
   }
 
-  async answer(question: string, passages: Hit[], { onText, signal }: AnswerOptions = {}): Promise<Generation> {
-    const { system, user } = this.prompt(question, passages);
+  async answer(
+    question: string,
+    passages: Hit[],
+    { onText, signal, history = [] }: AnswerOptions = {},
+  ): Promise<Generation> {
+    const { system, user } = this.prompt(question, passages, history);
+    const earlier = history.flatMap((t): Anthropic.Beta.BetaMessageParam[] => [
+      { role: "user", content: t.question },
+      { role: "assistant", content: t.answer },
+    ]);
 
     // Always streamed: the same call serves the JSON route (no onText) and the SSE one.
     const stream = this.client.beta.messages.stream(
@@ -32,7 +41,7 @@ export class ClaudeAnswerer implements Answerer {
         fallbacks: "default",
         output_config: { effort: "low" },
         system,
-        messages: [{ role: "user", content: user }],
+        messages: [...earlier, { role: "user", content: user }],
       },
       { signal },
     );

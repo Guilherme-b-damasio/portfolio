@@ -104,7 +104,10 @@ describe("AskQuestion", () => {
 describe("AskQuestion --xray", () => {
   const hits = (n: number): Hit[] =>
     Array.from({ length: n }, (_, i) => ({ ...hit, chunk: { ...hit.chunk, source: `s${i}` }, score: 10 - i }));
-  const prompting: Answerer = { ...echoAnswerer, prompt: (q, p) => ({ system: "sys", user: `${p.length}:${q}` }) };
+  const prompting: Answerer = {
+    ...echoAnswerer,
+    prompt: (q, p) => ({ system: "sys", history: [], user: `${p.length}:${q}` }),
+  };
   const prices = { priceOf: (m: string) => (m === "fake" ? { inputPerMTok: 4, outputPerMTok: 20 } : null) };
 
   it("ranks more candidates than it keeps and marks which ones reached the LLM", async () => {
@@ -118,7 +121,7 @@ describe("AskQuestion --xray", () => {
     expect(result.passages).toHaveLength(2);
     expect(result.xray!.terms).toEqual(["como", "funciona"]);
     expect(result.xray!.ranking.map((r) => r.kept)).toEqual([true, true, false, false, false, false]);
-    expect(result.xray!.prompt).toEqual({ system: "sys", user: "2:como funciona" });
+    expect(result.xray!.prompt).toEqual({ system: "sys", history: [], user: "2:como funciona" });
   });
 
   it("times the generation and prices it", async () => {

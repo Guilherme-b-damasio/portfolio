@@ -6,14 +6,22 @@ export interface Generation {
   outputTokens: number;
 }
 
+/** One earlier question and its answer. The visitor's browser keeps them; the server keeps nothing. */
+export interface Turn {
+  question: string;
+  answer: string;
+}
+
 export interface AnswerOptions {
   onText?: (delta: string) => void; // called with each piece of the answer as it is written
   signal?: AbortSignal; // aborts generation, e.g. when the visitor closes the stream
+  history?: Turn[]; // earlier turns of the conversation, oldest first
 }
 
 /** Exactly what the LLM is sent, so the x-ray can show it. */
 export interface Prompt {
   system: string;
+  history: Turn[];
   user: string;
 }
 
@@ -21,7 +29,7 @@ export interface Prompt {
 export interface Answerer {
   readonly model: string;
   answer(question: string, passages: Hit[], options?: AnswerOptions): Promise<Generation>;
-  prompt?(question: string, passages: Hit[]): Prompt;
+  prompt?(question: string, passages: Hit[], history?: Turn[]): Prompt;
 }
 
 export interface AskResult {
