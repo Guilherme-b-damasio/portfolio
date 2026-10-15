@@ -9,7 +9,16 @@ npm install
 npm run dev          # http://localhost:3000
 npm test
 npm run e2e          # Playwright smoke against the real server (E2E_CHANNEL=chrome reuses an installed Chrome)
+npm run eval         # recall@3 of the local index on data/evals/rag.json, question by question
 ```
+
+### RAG eval
+
+`data/evals/rag.json` holds questions a visitor would ask, each with the sources that should come
+back (`docsage.md` accepts any of its sections, `docsage.md › Decisões técnicas` only that one).
+`npm run eval` runs them through the real index and prints where the first expected source landed,
+recall@3 and MRR; CI runs it and `tests/rag-eval.test.ts` fails the build when recall drops below the
+set's `minRecall`. Misses stay in the set on purpose: they are what the next change to the index has to fix.
 
 Content lives in `content/` as Markdown: `profile.md` plus one file per project in
 `content/projects/`. Each `## ` heading becomes one searchable chunk; sections that
