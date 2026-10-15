@@ -15,6 +15,23 @@ export function formatMs(ms) {
   return ms >= 100 ? `${Math.round(ms)}ms` : `${Math.round(ms * 10) / 10}ms`;
 }
 
+/** "US$ 0.0108": cents are too coarse for one answer, so anything under a dollar keeps four decimals. */
+export function formatUsd(usd) {
+  return `US$ ${usd < 1 ? usd.toFixed(4) : usd.toFixed(2)}`;
+}
+
+/** Pulls a `--flag` out of a command's arguments: { on, rest }. */
+export function takeFlag(args, flag) {
+  const rest = args.filter((a) => a !== flag);
+  return { on: rest.length !== args.length, rest };
+}
+
+/** A score as a bar of `width` cells, relative to the best score of the ranking. */
+export function scoreBar(score, best, width = 12) {
+  const filled = best > 0 ? Math.max(1, Math.round((score / best) * width)) : 0;
+  return "█".repeat(filled) + "░".repeat(width - filled);
+}
+
 /** "há 2h", "há 3d": how long ago an ISO timestamp was, from `now`. */
 export function ago(iso, now = Date.now()) {
   if (!iso) return "";

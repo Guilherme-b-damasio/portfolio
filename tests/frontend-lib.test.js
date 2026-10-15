@@ -8,6 +8,7 @@ import {
   edgesFor,
   fieldOfByte,
   formatUptime,
+  formatUsd,
   guessCommand,
   highlightParts,
   hourStrip,
@@ -16,9 +17,30 @@ import {
   parseSse,
   routeLabel,
   scanHeadline,
+  scoreBar,
   sections,
   sparkPoints,
+  takeFlag,
 } from "../public/js/lib.js";
+
+describe("ask --xray helpers", () => {
+  it("pulls a flag out wherever it was typed", () => {
+    expect(takeFlag(["--xray", "o que é?"], "--xray")).toEqual({ on: true, rest: ["o que é?"] });
+    expect(takeFlag(["o", "que", "--xray"], "--xray")).toEqual({ on: true, rest: ["o", "que"] });
+    expect(takeFlag(["o que é?"], "--xray")).toEqual({ on: false, rest: ["o que é?"] });
+  });
+
+  it("keeps four decimals under a dollar", () => {
+    expect(formatUsd(0.0108)).toBe("US$ 0.0108");
+    expect(formatUsd(1.5)).toBe("US$ 1.50");
+  });
+
+  it("draws scores relative to the best one, never empty for a match", () => {
+    expect(scoreBar(4, 4, 4)).toBe("████");
+    expect(scoreBar(2, 4, 4)).toBe("██░░");
+    expect(scoreBar(0.01, 4, 4)).toBe("█░░░");
+  });
+});
 
 describe("front-end helpers", () => {
   it("formats uptime and relative build time", () => {
