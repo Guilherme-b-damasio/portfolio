@@ -24,7 +24,9 @@ the pod is serving; each engine is scored at most once every 10 minutes, whoever
 
 Content lives in `content/` as Markdown: `profile.md` plus one file per project in
 `content/projects/`. Each `## ` heading becomes one searchable chunk; sections that
-still start with `TODO` are left out of the index.
+still start with `TODO` are left out of the index. Index and questions go through the same light
+Portuguese stemmer (`src/infrastructure/search/portuguese-stemmer.ts`), so "trabalha" finds
+"trabalho" and "times" finds "time"; the x-ray shows the stems.
 
 | Env var             | Default           | Purpose                                              |
 | ------------------- | ----------------- | ---------------------------------------------------- |
@@ -54,6 +56,17 @@ still start with `TODO` are left out of the index.
 - Every push to `develop` publishes `ghcr.io/guilherme-b-damasio/portfolio:<timestamp>-<sha>`.
 - A Playwright smoke test opens the page at desktop and 375px, runs `help`, `ask` and `status`
   against the real server, and fails on any console error, failed request or sideways scroll.
+
+## What's new in 0.2
+
+- Answers stream over SSE, and `ask --xray` shows each step: query terms, the BM25 ranking with
+  scores, the exact prompt, time to first token, tokens/s and the estimated cost in US$.
+- Follow-up questions with a short memory kept by the browser (`ask --new` starts over), and
+  citations you can click to `cat` the section they came from.
+- `ask --engine docsage` searches a docsage index over MCP and falls back to the local BM25,
+  saying why, when docsage is off, slow or down.
+- A retrieval eval of 21 questions gates CI on recall@3, and `/evals` shows it live for the running
+  index. A light Portuguese stemmer took it from 0.905 to 0.952 (MRR 0.786 → 0.873).
 
 ## API
 
