@@ -10,6 +10,7 @@ import {
   formatUptime,
   formatUsd,
   guessCommand,
+  formatAttrs,
   highlightParts,
   hourStrip,
   ja4Parts,
@@ -23,6 +24,7 @@ import {
   sparkPoints,
   takeFlag,
   takeOption,
+  waterfallRows,
 } from "../public/js/lib.js";
 
 describe("ask --xray helpers", () => {
@@ -119,6 +121,32 @@ describe("front-end helpers", () => {
       { text: "Decisões", mark: true },
       { text: " técnicas", mark: false },
     ]);
+  });
+
+  it("lays a trace out as a waterfall on one time axis", () => {
+    const trace = {
+      route: "POST /api/ask",
+      status: 200,
+      durationMs: 100,
+      spans: [
+        { name: "retrieve", startMs: 0, durationMs: 2, error: false, attrs: { engine: "local" } },
+        { name: "generate", startMs: 50, durationMs: 50, error: true, attrs: {} },
+      ],
+    };
+    expect(waterfallRows(trace, 10)).toEqual([
+      { name: "POST /api/ask", pad: 0, bar: 10, ms: 100, error: false, attrs: {} },
+      { name: "retrieve", pad: 0, bar: 1, ms: 2, error: false, attrs: { engine: "local" } },
+      { name: "generate", pad: 5, bar: 5, ms: 50, error: true, attrs: {} },
+    ]);
+    // A span that starts at the very end still gets one visible cell inside the axis.
+    const late = waterfallRows({ ...trace, spans: [{ ...trace.spans[0], startMs: 100, durationMs: 0 }] }, 10)[1];
+    expect(late).toMatchObject({ pad: 9, bar: 1 });
+  });
+
+  it("prints span attributes without the empty ones", () => {
+    expect(formatAttrs({ engine: "local", hits: 4, fallback: false, firstTokenMs: null })).toBe(
+      "engine=local hits=4 fallback=false",
+    );
   });
 
   it("marks the whole word a stem matched", () => {
