@@ -130,11 +130,14 @@ export function guessCommand(name, commands) {
   );
 }
 
-/** Splits text around the query terms BM25 matched: [{ text, mark }]. Matching ignores accents and case. */
+/**
+ * Splits text around the query terms BM25 matched: [{ text, mark }]. Matching ignores accents and case.
+ * Terms are stems ("trabalh"), so a mark runs to the end of the word: "trabalho", not "trabalh".
+ */
 export function highlightParts(text, terms) {
   if (!terms.length) return [{ text, mark: false }];
   const escaped = terms.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-  const pattern = new RegExp(`(${escaped.join("|")})`, "gi");
+  const pattern = new RegExp(`(?:${escaped.join("|")})[a-z0-9]*`, "gi");
   const parts = [];
   let last = 0;
   for (const m of fold(text).matchAll(pattern)) {

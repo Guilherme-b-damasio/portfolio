@@ -121,6 +121,15 @@ describe("front-end helpers", () => {
     ]);
   });
 
+  it("marks the whole word a stem matched", () => {
+    expect(highlightParts("Trabalho em times ágeis", ["trabalh", "tim"])).toEqual([
+      { text: "Trabalho", mark: true },
+      { text: " em ", mark: false },
+      { text: "times", mark: true },
+      { text: " ágeis", mark: false },
+    ]);
+  });
+
   it("turns citations into commands", () => {
     expect(citationParts("Indexa PDF [docsage.md › O que é].")).toEqual([
       { text: "Indexa PDF " },
