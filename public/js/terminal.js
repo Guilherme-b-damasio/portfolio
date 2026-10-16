@@ -1,9 +1,10 @@
-import { api, apiStream } from "./api.js";
+import { api, apiStream, lastTraceId } from "./api.js";
 import { el } from "./dom.js";
 import { collectProbe } from "./probe.js";
 import {
   citationParts,
   commandForSource,
+  formatAttrs,
   formatMs,
   formatUptime,
   formatUsd,
@@ -18,9 +19,10 @@ import {
   takeFlag,
   takeOption,
   VERDICTS,
+  waterfallRows,
 } from "./lib.js";
 
-const COMMANDS = ["help", "whoami", "ls", "cat", "ask", "status", "scan", "curl", "open", "clear"];
+const COMMANDS = ["help", "whoami", "ls", "cat", "ask", "status", "trace", "scan", "curl", "open", "clear"];
 const OPENABLE = PAGES.filter((p) => p !== "inicio");
 const CHIPS = ["whoami", "ls projects", 'ask "como funciona o docsage?"', "status", "curl /api/projects", "help"];
 const isTodo = (text) => /^TODO\b/.test(text.trim());
@@ -102,6 +104,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ['ask --new "<pergunta>"', "esquece a conversa e começa outra"],
         ['ask --engine docsage "<pergunta>"', "busca no docsage em vez do índice local"],
         ["status", "métricas ao vivo deste servidor"],
+        ["trace [id]", "cada etapa da última requisição (ou da do id)"],
         ["scan", "o que este site sabe sobre você"],
         ["curl <caminho>", "chama a API crua, ex: curl /api/profile"],
         ["open <página>", OPENABLE.join(" · ")],
@@ -323,7 +326,16 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         );
       }
       parts.push(`total ${formatMs(ms)}`, `rate limit restante ${remaining}`);
-      print(line([dim(parts.join(" · "))], "t-meta"));
+      const traceId = res.headers.get("x-trace-id");
+      print(
+        line(
+          [
+            dim(parts.join(" · ")),
+            ...(traceId ? [dim(" · "), runButton("trace", `trace ${traceId}`, "ver o trace")] : []),
+          ],
+          "t-meta",
+        ),
+      );
       if (body.xray) printXray(body);
     },
 
@@ -347,6 +359,34 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ["commit", body.build.commit.slice(0, 7)],
       ];
       print(...rows.map(([k, v]) => line([dim(k.padEnd(11)), v])));
+    },
+
+    async trace(args) {
+      const id = args[0] ?? lastTraceId();
+      if (!id) return say(warn("! "), "uso: trace <id> · o id vem no header x-trace-id de cada resposta da API");
+      if (!/^[0-9a-f]{16}$/.test(id)) return say(warn("! "), `trace: "${id.slice(0, 40)}" não é um id de trace`);
+      const { res, body } = await api(`/api/traces/${id}`);
+      if (res.status === 404) return say(warn("! 404 "), body.error);
+      if (!res.ok) return failed(res.status);
+
+      say(dim(`trace ${body.id} · ${body.status} · ${formatMs(body.durationMs)} · ${body.startedAt}`));
+      const rows = waterfallRows(body);
+      const label = Math.min(16, Math.max(...rows.map((r) => r.name.length)));
+      for (const r of rows) {
+        const cls = r.error ? "t-warn" : "t-acc";
+        print(
+          line([
+            text(r.name.slice(0, label).padEnd(label + 2), r.error ? "t-warn" : undefined),
+            dim("·".repeat(r.pad)),
+            text("█".repeat(r.bar), cls),
+            dim("·".repeat(24 - r.pad - r.bar)),
+            ` ${formatMs(r.ms).padStart(7)}`,
+            dim(formatAttrs(r.attrs) ? `  ${formatAttrs(r.attrs)}` : ""),
+          ]),
+        );
+      }
+      if (body.droppedSpans) say(dim(`+${body.droppedSpans} etapas além do limite por trace`));
+      if (!body.spans.length) say(dim("sem etapas internas: a rota respondeu direto"));
     },
 
     async scan() {
