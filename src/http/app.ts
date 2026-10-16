@@ -2,11 +2,13 @@ import path from "node:path";
 import express from "express";
 import type { Logger } from "../domain/logger.js";
 import type { MetricsStore } from "../domain/metrics.js";
+import type { TraceStore } from "../domain/tracing.js";
 import { accessLog } from "./middleware/access-log.js";
 import { recordMetrics } from "./middleware/metrics.js";
 import { proxiedClient } from "./middleware/proxied-client.js";
 import { requestId } from "./middleware/request-id.js";
 import { securityHeaders } from "./middleware/security-headers.js";
+import { tracing } from "./middleware/tracing.js";
 import { apiRouter, askGuardsFor, type ApiDeps } from "./routes/api.js";
 import { mcpRouter } from "./routes/mcp.js";
 
@@ -14,9 +16,10 @@ export interface AppDeps extends ApiDeps {
   metrics: MetricsStore;
   logger: Logger;
   publicDir: string;
+  traces?: TraceStore | null; // without one, requests are not traced
 }
 
-export function createApp({ metrics, logger, publicDir, ...apiDeps }: AppDeps) {
+export function createApp({ metrics, logger, publicDir, traces, ...apiDeps }: AppDeps) {
   const app = express();
   app.set("trust proxy", 1); // behind Traefik in k3s, so req.ip is the real client
   app.disable("x-powered-by");
@@ -25,6 +28,7 @@ export function createApp({ metrics, logger, publicDir, ...apiDeps }: AppDeps) {
   app.use(securityHeaders());
   app.use(accessLog(logger));
   app.use(recordMetrics(metrics));
+  if (traces) app.use(tracing(traces));
   app.use(express.json({ limit: "4kb" }));
 
   app.get("/healthz", (_req, res) => {

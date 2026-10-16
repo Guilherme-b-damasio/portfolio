@@ -310,3 +310,29 @@ export function parseSse(buffer) {
   }
   return { events, rest };
 }
+
+/**
+ * Rows of a trace waterfall: the whole request first, then each span placed on the same time axis.
+ * `pad` is the blank before the bar and `bar` its length, both in characters out of `width`.
+ */
+export function waterfallRows(trace, width = 24) {
+  const total = Math.max(trace.durationMs, 0.1);
+  const cells = (ms) => Math.round((ms / total) * width);
+  const row = (name, startMs, durationMs, error, attrs) => {
+    const pad = Math.min(cells(startMs), width - 1);
+    const bar = Math.max(1, Math.min(cells(durationMs), width - pad));
+    return { name, pad, bar, ms: durationMs, error, attrs };
+  };
+  return [
+    row(trace.route, 0, trace.durationMs, trace.status >= 500, {}),
+    ...trace.spans.map((s) => row(s.name, s.startMs, s.durationMs, s.error, s.attrs)),
+  ];
+}
+
+/** "engine=local hits=4": span attributes as the terminal prints them, nulls left out. */
+export function formatAttrs(attrs) {
+  return Object.entries(attrs)
+    .filter(([, v]) => v !== null && v !== undefined)
+    .map(([k, v]) => `${k}=${v}`)
+    .join(" ");
+}

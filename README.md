@@ -91,6 +91,7 @@ Portuguese stemmer (`src/infrastructure/search/portuguese-stemmer.ts`), so "trab
 | `GET /api/scan/tls-samples` | Real ClientHellos captured from known clients (`data/tls-samples/`), with JA4 and every byte annotated |
 | `GET /api/status`         | Uptime, memory, pod/node, p50/p95 per route, tokens spent today (`llmBudget`) |
 | `GET /api/status/history` | In-process samples every 5 min for the last 24h (reset on restart) |
+| `GET /api/traces/:id`     | One finished `/api` or `/mcp` request, step by step: route, status, total time and its spans (`retrieve`, `generate`) with offsets, durations and attributes. The id comes in each response's `x-trace-id`; the last 500 are kept in memory, 32 spans each. `trace [id]` in the terminal draws the waterfall |
 | `GET /metrics`            | Prometheus text format, including `portfolio_llm_tokens_used_today` |
 | `GET /healthz`            | Probes                                      |
 
@@ -149,6 +150,15 @@ Every line on stdout is one JSON object with `time`, `level` and `msg`. Each fin
 request logs `requestId`, `route` (the matched route, e.g. `GET /api/projects/:slug`),
 `status` and `ms`; `/healthz` probes are skipped. Responses carry an `x-request-id`
 header: a safe incoming one (from the ingress) is reused, otherwise a UUID is generated.
+
+## Tracing
+
+Every `/api` and `/mcp` request opens a trace (`src/infrastructure/tracing/in-memory-traces.ts`) and
+answers with its random id in `x-trace-id`. Use cases time their steps as spans of it: `ask` records
+`retrieve` (engine, k, hits, fallback) and `generate` (model, tokens, time to the first token).
+Attributes are set by code, never copied from what the visitor sent. Finished traces live in a ring
+buffer of 500, so `GET /api/traces/:id` works for a few hundred requests and then answers 404. Each
+answer in the terminal ends with a `trace` link, and `trace` alone opens the last request you made.
 
 ## Deploy (k3s)
 

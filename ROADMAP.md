@@ -55,7 +55,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 
 ## 0.3 Infra à mostra
 
-- [ ] Tracing com spans num buffer em memória e `x-trace-id` na resposta. `trace <id>` mostra o waterfall
+- [x] Tracing com spans num buffer em memória e `x-trace-id` na resposta. `trace <id>` mostra o waterfall
 - [ ] Clicar num comando já executado no terminal abre o trace dele
 - [ ] Porta `ClusterReader` + adapter da API do Kubernetes (só leitura, whitelist de namespaces) + fake para testes
 - [ ] `kubectl get pods` e painel "Cluster": node, pods, CPU/memória (metrics-server), restarts, idade

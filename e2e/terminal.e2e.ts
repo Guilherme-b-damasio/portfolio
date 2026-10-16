@@ -193,3 +193,16 @@ test("/evals scores the real index and a question opens in the terminal", async 
   await page.getByRole("button", { name: "o que é o docsage?" }).click();
   await expect(home.locator("#term-out")).toContainText("mostrando só a recuperação");
 });
+
+test("trace shows the waterfall of the answer it came from", async ({ home }) => {
+  await run(home, 'ask "o que é o docsage?"');
+  const out = home.locator("#term-out");
+  await out.locator(".t-meta").last().getByRole("button", { name: "ver o trace" }).click();
+  await expect(out).toContainText(/trace [0-9a-f]{16} · 200/);
+  await expect(out).toContainText("POST /api/ask");
+  await expect(out).toContainText("retrieve");
+  await expect(out).toContainText("engine=local");
+  // The waterfall is the widest thing the terminal prints; it must still fit at 375px.
+  const overflow = await home.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});

@@ -2,6 +2,7 @@ import type { Answerer, AskResult, AskXray, Turn } from "../domain/answer.js";
 import { costUsd, type PriceList } from "../domain/pricing.js";
 import { type Hit, type Retriever, RetrieverUnavailable } from "../domain/search.js";
 import type { TokenBudget } from "../domain/token-budget.js";
+import { type SpanAttrs, type Trace, untraced } from "../domain/tracing.js";
 
 export interface AskOptions {
   topK?: number;
@@ -22,6 +23,7 @@ export interface AskProgress {
   xray?: boolean; // also report every step of the answer
   history?: Turn[]; // earlier turns, oldest first, when this is a follow-up
   engine?: string; // which retriever to search with; anything unknown or failing falls back to "local"
+  trace?: Trace; // the request's trace: retrieval and generation become spans of it
 }
 
 /**
@@ -60,7 +62,15 @@ export class AskQuestion {
 
   async execute(
     question: string,
-    { onPassages, onText, signal, xray = false, history = [], engine = LOCAL_ENGINE }: AskProgress = {},
+    {
+      onPassages,
+      onText,
+      signal,
+      xray = false,
+      history = [],
+      engine = LOCAL_ENGINE,
+      trace = untraced,
+    }: AskProgress = {},
   ): Promise<AskResult> {
     const turns = this.maxTurns > 0 ? history.slice(-this.maxTurns) : [];
     // "e qual a stack?" names nothing: the previous question supplies the subject for retrieval.
@@ -68,10 +78,20 @@ export class AskQuestion {
 
     const t0 = performance.now();
     // The x-ray also shows the runners-up, so it asks for more than the LLM will get.
-    const { ranked, used, fallback } = await this.retrieve(
-      engine,
-      query,
-      xray ? Math.max(this.topK, this.xrayCandidates) : this.topK,
+    const k = xray ? Math.max(this.topK, this.xrayCandidates) : this.topK;
+    const retrieveAttrs: SpanAttrs = { engine, k };
+    const { ranked, used, fallback } = await trace.span(
+      "retrieve",
+      async () => {
+        const found = await this.retrieve(engine, query, k);
+        Object.assign(retrieveAttrs, {
+          engine: found.used,
+          hits: found.ranked.length,
+          fallback: found.fallback !== null,
+        });
+        return found;
+      },
+      retrieveAttrs,
     );
     const passages = ranked.slice(0, this.topK);
     const retrieval = performance.now() - t0;
@@ -108,14 +128,28 @@ export class AskQuestion {
 
     const t1 = performance.now();
     let firstToken: number | null = null;
-    const { text, inputTokens, outputTokens } = await this.answerer.answer(question, passages, {
-      onText: (delta) => {
-        firstToken ??= performance.now() - t1;
-        onText?.(delta);
+    const answerer = this.answerer;
+    const generateAttrs: SpanAttrs = { model: answerer.model };
+    const { text, inputTokens, outputTokens } = await trace.span(
+      "generate",
+      async () => {
+        const answer = await answerer.answer(question, passages, {
+          onText: (delta) => {
+            firstToken ??= performance.now() - t1;
+            onText?.(delta);
+          },
+          signal,
+          history: turns,
+        });
+        Object.assign(generateAttrs, {
+          inputTokens: answer.inputTokens,
+          outputTokens: answer.outputTokens,
+          firstTokenMs: firstToken === null ? null : Math.round(firstToken),
+        });
+        return answer;
       },
-      signal,
-      history: turns,
-    });
+      generateAttrs,
+    );
     const generation = performance.now() - t1;
     this.budget?.charge(inputTokens + outputTokens);
 
