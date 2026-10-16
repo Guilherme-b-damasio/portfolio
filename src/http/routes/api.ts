@@ -8,6 +8,7 @@ import type { InspectVisitor } from "../../application/inspect-visitor.js";
 import type { ReportStatus } from "../../application/report-status.js";
 import type { SendContact } from "../../application/send-contact.js";
 import type { ShowEvals } from "../../application/show-evals.js";
+import type { ShowTrace } from "../../application/show-trace.js";
 import type { Logger } from "../../domain/logger.js";
 import type { TappedConnections } from "../../domain/tls.js";
 import { concurrencyCap, ConcurrencyGate } from "../middleware/concurrency.js";
@@ -29,6 +30,7 @@ export interface ApiDeps {
   askConcurrency?: number; // questions answered at once, across every visitor
   askTimeoutMs?: number; // generation is aborted past this, streamed or not
   showEvals?: ShowEvals | null; // the retrieval eval at /api/evals; off without an eval set
+  showTrace?: ShowTrace | null; // finished traces at /api/traces/:id; off without a trace store
 }
 
 // A follow-up carries the last turns from the browser. Capped here so a visitor cannot inflate the prompt.
@@ -72,6 +74,7 @@ export function apiRouter(
     tlsSamples,
     askTimeoutMs = 60_000,
     showEvals,
+    showTrace,
   }: ApiDeps,
   logger: Logger,
   { bucket: askBucket, gate: askGate }: AskGuards,
@@ -139,7 +142,17 @@ export function apiRouter(
 
     if (!req.get("accept")?.includes("text/event-stream")) {
       try {
-        res.json(logFallback(await askQuestion.execute(question, { signal: abort.signal, xray, history, engine })));
+        res.json(
+          logFallback(
+            await askQuestion.execute(question, {
+              signal: abort.signal,
+              xray,
+              history,
+              engine,
+              trace: res.locals.trace,
+            }),
+          ),
+        );
       } catch (err) {
         next(err);
       }
@@ -155,6 +168,7 @@ export function apiRouter(
         xray,
         history,
         engine,
+        trace: res.locals.trace,
       });
       stream.send("done", logFallback(result));
     } catch (err) {
@@ -175,6 +189,17 @@ export function apiRouter(
   api.get("/status/history", (_req, res) => {
     res.json(reportStatus.history());
   });
+
+  // A finished request, step by step. Ids are random and only handed to whoever made the request.
+  if (showTrace)
+    api.get("/traces/:id", (req, res) => {
+      const trace = showTrace.byId(req.params.id);
+      if (!trace) {
+        res.status(404).json({ error: "trace não encontrado: ele expira depois de algumas centenas de requisições" });
+        return;
+      }
+      res.json(trace);
+    });
 
   api.use("/contact", contactRouter(sendContact, logger));
   if (showEvals) api.use("/evals", evalsRouter(showEvals));

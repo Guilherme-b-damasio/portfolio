@@ -13,6 +13,7 @@ import { scanChecks } from "./application/scan/checks/index.js";
 import { ReportStatus } from "./application/report-status.js";
 import { SendContact } from "./application/send-contact.js";
 import { ShowEvals } from "./application/show-evals.js";
+import { ShowTrace } from "./application/show-trace.js";
 import { createApp } from "./http/app.js";
 import { MAX_TURNS } from "./http/routes/api.js";
 import { MarkdownContentSource } from "./infrastructure/content/markdown-content-source.js";
@@ -30,6 +31,7 @@ import { SampledHistory } from "./infrastructure/metrics/sampled-history.js";
 import { Bm25Retriever } from "./infrastructure/search/bm25-retriever.js";
 import { chunkContent } from "./infrastructure/search/chunker.js";
 import { DocsageRetriever } from "./infrastructure/search/docsage-retriever.js";
+import { InMemoryTraces } from "./infrastructure/tracing/in-memory-traces.js";
 
 // The only composition root: every adapter is built here and injected into the use cases.
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -63,6 +65,8 @@ const metrics = new InMemoryMetrics();
 const history = new SampledHistory(metrics);
 const stopSampling = history.start();
 const logger = new JsonLogger();
+// The last 500 API requests, step by step, for `trace <id>`.
+const traces = new InMemoryTraces({ capacity: 500 });
 // With a certificate the app also terminates TLS itself, so the scan can read each visitor's ClientHello.
 // In the cluster this needs a TCP passthrough route; behind a TLS-terminating proxy there is nothing to read.
 const certFile = process.env.TLS_CERT_FILE;
@@ -84,6 +88,8 @@ const app = createApp({
   tlsSamples: new BrowseTlsSamples(await FileTlsSamples.load(path.join(root, "data", "tls-samples"))),
   metrics,
   logger,
+  traces,
+  showTrace: new ShowTrace(traces),
   publicDir: path.join(root, "public"),
   // Questions per visitor: a bucket this size that refills at the same rate per minute.
   askLimit: { capacity: askRate, refillPerMinute: askRate },
