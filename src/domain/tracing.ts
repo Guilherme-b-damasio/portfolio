@@ -34,3 +34,6 @@ export interface TraceStore {
   start(): ActiveTrace;
   get(id: string): TraceRecord | null;
 }
+
+/** For callers outside a request (the eval, tests): every step just runs. */
+export const untraced: Trace = { span: async (_name, step) => step() };
