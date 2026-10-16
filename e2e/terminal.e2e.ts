@@ -101,7 +101,8 @@ test("ask --xray shows the real tokenization and BM25 ranking", async ({ home })
   await run(home, 'ask --xray "como funciona o docsage?"');
   const out = home.locator("#term-out");
   await expect(out).toContainText("── raio-x ──");
-  await expect(out.locator(".t-token").first()).toHaveText("funciona");
+  // The index stems Portuguese, so the x-ray shows "funcion": the term the ranking actually used.
+  await expect(out.locator(".t-token").first()).toHaveText("funcion");
   await expect(out).toContainText(/ranking BM25\s+\d+ candidatos, \d+ vão para o prompt/);
   await expect(out).toContainText("sem LLM neste ambiente");
 });
