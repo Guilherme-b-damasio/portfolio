@@ -50,9 +50,18 @@ describe("search", () => {
     expect(sources.filter((s) => s.startsWith("docsage.md")).length).toBeGreaterThan(1);
   });
 
-  it("shows the query as the index sees it: folded, without stopwords, deduplicated", () => {
+  it("shows the query as the index sees it: folded, stemmed, without stopwords, deduplicated", () => {
     const retriever = new Bm25Retriever(chunkContent(content));
-    expect(retriever.terms("Como funciona a Busca? busca BM25")).toEqual(["funciona", "busca", "bm25"]);
+    expect(retriever.terms("Como funciona a Busca? buscar BM25")).toEqual(["funcion", "busc", "bm25"]);
+  });
+
+  it("finds a section by another form of the same word, and only by the exact word without stemming", () => {
+    const chunks = [
+      { id: "a#1", source: "a.md › Como eu trabalho", text: "trabalho em times ágeis" },
+      { id: "b#1", source: "b.md › Stack", text: "Node.js e TypeScript" },
+    ];
+    expect(new Bm25Retriever(chunks).search("como você trabalha em time?")[0].chunk.id).toBe("a#1");
+    expect(new Bm25Retriever(chunks, 1.5, 0.75, (t) => t).search("como você trabalha em time?")).toEqual([]);
   });
 
   it("returns nothing for unrelated questions", () => {

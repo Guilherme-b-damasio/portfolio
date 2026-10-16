@@ -1,9 +1,10 @@
 import type { Chunk, Hit, Retriever } from "../../domain/search.js";
+import { stemPortuguese } from "./portuguese-stemmer.js";
 
 const STOPWORDS = new Set(
   (
     "a o as os um uma de do da dos das em no na nos nas por para pra com sem que e ou se " +
-    "é são foi ser ter tem como mais mas eu você ele ela isso esse essa este esta qual quais " +
+    "é são foi ser ter tem faz fez fazer fazendo como mais mas eu você ele ela isso esse essa este esta qual quais " +
     "the a an of to in on for with and or is are was be it this that what which how do does you"
   ).split(" "),
 );
@@ -27,10 +28,12 @@ export class Bm25Retriever implements Retriever {
     chunks: Chunk[],
     private readonly k1 = 1.5,
     private readonly b = 0.75,
+    // Applied to both the index and the query, so "trabalha" finds "trabalho". Pass `(t) => t` to match exact words.
+    private readonly stem: (term: string) => string = stemPortuguese,
   ) {
     this.docs = chunks.map((chunk) => {
       // Index the source without ".md" so "docsage" matches every section of docsage.md.
-      const tokens = tokenize(`${chunk.source.replace(/\.md\b/g, "")} ${chunk.text}`);
+      const tokens = tokenize(`${chunk.source.replace(/\.md\b/g, "")} ${chunk.text}`).map(this.stem);
       const terms = new Map<string, number>();
       for (const t of tokens) terms.set(t, (terms.get(t) ?? 0) + 1);
       for (const t of terms.keys()) this.df.set(t, (this.df.get(t) ?? 0) + 1);
@@ -40,7 +43,7 @@ export class Bm25Retriever implements Retriever {
   }
 
   terms(query: string): string[] {
-    return [...new Set(tokenize(query))];
+    return [...new Set(tokenize(query).map(this.stem))];
   }
 
   search(query: string, k = 4): Hit[] {

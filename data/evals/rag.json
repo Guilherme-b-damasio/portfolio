@@ -1,6 +1,6 @@
 {
   "k": 3,
-  "minRecall": 0.9,
+  "minRecall": 0.95,
   "cases": [
     { "question": "o que é o docsage?", "expected": ["docsage.md"] },
     { "question": "como o docsage divide os documentos em chunks?", "expected": ["docsage.md › Decisões técnicas"] },
