@@ -58,7 +58,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 - [x] Tracing com spans num buffer em memória e `x-trace-id` na resposta. `trace <id>` mostra o waterfall
 - [x] Clicar num comando já executado no terminal abre o trace dele
 - [x] Porta `ClusterReader` + adapter da API do Kubernetes (só leitura, whitelist de namespaces) + fake para testes
-- [ ] `kubectl get pods` e painel "Cluster": node, pods, CPU/memória (metrics-server), restarts, idade
+- [x] `kubectl get pods` e painel "Cluster": node, pods, CPU/memória (metrics-server), restarts, idade
 - [ ] Manifests de RBAC só leitura em `deploy/` (Role/ClusterRole mínimos)
 - [x] Ring buffer de 24h das métricas no processo, com sparklines no painel "Ao vivo"
 - [ ] `deploys`: linha do tempo commit → imagem → Flux → pod pronto (API do GitHub + eventos do cluster)

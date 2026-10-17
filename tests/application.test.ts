@@ -193,8 +193,14 @@ describe("ReportStatus", () => {
     const metrics: MetricsStore = { record: () => {}, snapshot: () => snapshot, prometheus: () => "x 1\n" };
     const history: MetricsHistory = { intervalMs: 300_000, points: () => [] };
     const report = new ReportStatus(metrics, null, history);
-    expect(report.status()).toEqual({ ...snapshot, llm: null, llmBudget: null });
+    expect(report.status()).toEqual({ ...snapshot, llm: null, llmBudget: null, cluster: null });
     expect(report.prometheus()).toBe("x 1\n");
+  });
+
+  it("names the visible namespaces when the cluster can be read", () => {
+    const metrics = { snapshot: () => ({}) } as unknown as MetricsStore;
+    const report = new ReportStatus(metrics, null, { intervalMs: 1, points: () => [] }, null, ["portfolio"]);
+    expect(report.status().cluster).toEqual({ namespaces: ["portfolio"] });
   });
 
   it("reports the history interval in seconds", () => {

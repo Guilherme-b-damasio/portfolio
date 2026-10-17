@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { AskQuestion } from "./application/ask-question.js";
 import { BrowsePortfolio } from "./application/browse-portfolio.js";
 import { BrowseTlsSamples } from "./application/browse-tls-samples.js";
+import { InspectCluster } from "./application/inspect-cluster.js";
 import { InspectVisitor } from "./application/inspect-visitor.js";
 import { scanChecks } from "./application/scan/checks/index.js";
 import { ReportStatus } from "./application/report-status.js";
@@ -16,6 +17,9 @@ import { ShowEvals } from "./application/show-evals.js";
 import { ShowTrace } from "./application/show-trace.js";
 import { createApp } from "./http/app.js";
 import { MAX_TURNS } from "./http/routes/api.js";
+import { CachedClusterReader } from "./infrastructure/cluster/cached-cluster-reader.js";
+import { inClusterGet } from "./infrastructure/cluster/in-cluster-get.js";
+import { KubernetesClusterReader } from "./infrastructure/cluster/kubernetes-cluster-reader.js";
 import { MarkdownContentSource } from "./infrastructure/content/markdown-content-source.js";
 import { loadEvalSet } from "./infrastructure/evals/json-eval-set.js";
 import { JsonLogger } from "./infrastructure/logging/json-logger.js";
@@ -71,6 +75,16 @@ const traces = new InMemoryTraces({ capacity: 500 });
 // In the cluster this needs a TCP passthrough route; behind a TLS-terminating proxy there is nothing to read.
 const certFile = process.env.TLS_CERT_FILE;
 const keyFile = process.env.TLS_KEY_FILE;
+// Inside the cluster the pod reads its own nodes and pods with its service account (k8s/rbac.yaml).
+// Only these namespaces are listed; outside a cluster `kubectl` and the panel say the cluster is off.
+const kubeGet = inClusterGet();
+const clusterNamespaces = (process.env.CLUSTER_NAMESPACES ?? process.env.POD_NAMESPACE ?? "portfolio")
+  .split(",")
+  .map((ns) => ns.trim())
+  .filter(Boolean);
+const clusterReader = kubeGet
+  ? new CachedClusterReader(new KubernetesClusterReader(kubeGet, { namespaces: clusterNamespaces }))
+  : null;
 const tap = certFile && keyFile ? new TlsTap({ proxyProtocol: process.env.TLS_PROXY_PROTOCOL === "1" }) : null;
 
 const app = createApp({
@@ -81,7 +95,13 @@ const app = createApp({
     maxTurns: MAX_TURNS,
     engines: docsage ? { docsage } : {},
   }),
-  reportStatus: new ReportStatus(metrics, answerer?.model ?? null, history, budget),
+  reportStatus: new ReportStatus(
+    metrics,
+    answerer?.model ?? null,
+    history,
+    budget,
+    clusterReader ? clusterReader.namespaces : null,
+  ),
   sendContact: new SendContact(mailer),
   inspectVisitor: new InspectVisitor(scanChecks(), new DnsReverseLookup()),
   tapped: tap,
@@ -90,6 +110,7 @@ const app = createApp({
   logger,
   traces,
   showTrace: new ShowTrace(traces),
+  inspectCluster: new InspectCluster(clusterReader),
   publicDir: path.join(root, "public"),
   // Questions per visitor: a bucket this size that refills at the same rate per minute.
   askLimit: { capacity: askRate, refillPerMinute: askRate },
@@ -109,6 +130,7 @@ const server = app.listen(port, () => {
     llm: answerer?.model ?? "off",
     docsage: docsage ? "on" : "off",
     contact: mailer ? "on" : "off",
+    cluster: clusterReader ? clusterNamespaces.join(",") : "off",
   });
 });
 

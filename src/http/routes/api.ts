@@ -4,6 +4,7 @@ import type { AskQuestion } from "../../application/ask-question.js";
 import type { AskResult } from "../../domain/answer.js";
 import type { BrowsePortfolio } from "../../application/browse-portfolio.js";
 import type { BrowseTlsSamples } from "../../application/browse-tls-samples.js";
+import type { InspectCluster } from "../../application/inspect-cluster.js";
 import type { InspectVisitor } from "../../application/inspect-visitor.js";
 import type { ReportStatus } from "../../application/report-status.js";
 import type { SendContact } from "../../application/send-contact.js";
@@ -14,6 +15,7 @@ import type { TappedConnections } from "../../domain/tls.js";
 import { concurrencyCap, ConcurrencyGate } from "../middleware/concurrency.js";
 import { rateLimit, TokenBucket } from "../middleware/rate-limit.js";
 import { openEventStream } from "../sse.js";
+import { clusterRouter } from "./cluster.js";
 import { contactRouter } from "./contact.js";
 import { evalsRouter } from "./evals.js";
 import { scanRouter } from "./scan.js";
@@ -31,6 +33,7 @@ export interface ApiDeps {
   askTimeoutMs?: number; // generation is aborted past this, streamed or not
   showEvals?: ShowEvals | null; // the retrieval eval at /api/evals; off without an eval set
   showTrace?: ShowTrace | null; // finished traces at /api/traces/:id; off without a trace store
+  inspectCluster?: InspectCluster | null; // /api/cluster; without one it answers that the cluster is off
 }
 
 // A follow-up carries the last turns from the browser. Capped here so a visitor cannot inflate the prompt.
@@ -75,6 +78,7 @@ export function apiRouter(
     askTimeoutMs = 60_000,
     showEvals,
     showTrace,
+    inspectCluster,
   }: ApiDeps,
   logger: Logger,
   { bucket: askBucket, gate: askGate }: AskGuards,
@@ -201,6 +205,7 @@ export function apiRouter(
       res.json(trace);
     });
 
+  if (inspectCluster) api.use("/cluster", clusterRouter(inspectCluster));
   api.use("/contact", contactRouter(sendContact, logger));
   if (showEvals) api.use("/evals", evalsRouter(showEvals));
   api.use("/scan", scanRouter(inspectVisitor, tapped ?? null, tlsSamples ?? null));

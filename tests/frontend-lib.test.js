@@ -14,6 +14,12 @@ import {
   highlightParts,
   hourStrip,
   ja4Parts,
+  formatMi,
+  formatMilli,
+  kubeAge,
+  nodeRows,
+  percentOf,
+  podRows,
   parseLine,
   parseSse,
   rememberTurn,
@@ -276,5 +282,59 @@ describe("hex dump helpers", () => {
       { event: "message", data: { x: 2 } },
     ]);
     expect(second.rest).toBe("");
+  });
+});
+
+describe("kubectl helpers", () => {
+  const now = Date.parse("2026-10-17T12:00:00Z");
+  const pod = {
+    namespace: "portfolio",
+    name: "portfolio-7d9f-abcde",
+    phase: "Running",
+    ready: "1/1",
+    restarts: 2,
+    startedAt: "2026-10-16T00:00:00Z",
+    cpuUsageMilli: 3,
+    memoryUsageBytes: 64 * 2 ** 20,
+  };
+
+  it("prints ages in kubectl's units", () => {
+    expect(kubeAge("2026-10-17T11:59:15Z", now)).toBe("45s");
+    expect(kubeAge("2026-10-17T11:48:00Z", now)).toBe("12m");
+    expect(kubeAge("2026-10-17T09:00:00Z", now)).toBe("3h");
+    expect(kubeAge("2026-10-12T12:00:00Z", now)).toBe("5d");
+    expect(kubeAge(null, now)).toBe("<unknown>");
+  });
+
+  it("formats usage and leaves a dash without metrics-server", () => {
+    expect(formatMilli(410)).toBe("410m");
+    expect(formatMi(64 * 2 ** 20)).toBe("64Mi");
+    expect(formatMi(1.5 * 2 ** 30)).toBe("1.5Gi");
+    expect(formatMi(null)).toBe("–");
+    expect(percentOf(410, 2000)).toBe(21);
+    expect(percentOf(null, 2000)).toBeNull();
+  });
+
+  it("lays pods out in kubectl's columns", () => {
+    expect(podRows([pod], { now })).toEqual([
+      "NAME                   READY   STATUS    RESTARTS   AGE   CPU   MEMORY",
+      "portfolio-7d9f-abcde   1/1     Running   2          36h   3m    64Mi",
+    ]);
+    expect(podRows([pod], { allNamespaces: true, now })[1]).toMatch(/^portfolio {3}portfolio-7d9f-abcde/);
+  });
+
+  it("shows node usage beside its share of the capacity", () => {
+    const node = {
+      name: "vps-1",
+      ready: true,
+      kubeletVersion: "v1.33.4+k3s1",
+      createdAt: "2026-09-01T00:00:00Z",
+      cpuCapacityMilli: 2000,
+      memoryCapacityBytes: 4 * 2 ** 30,
+      cpuUsageMilli: 410,
+      memoryUsageBytes: 2 ** 30,
+    };
+    expect(nodeRows([node], now)[1]).toBe("vps-1   Ready    46d   v1.33.4+k3s1   410m (21%)   1.0Gi (25%)");
+    expect(nodeRows([{ ...node, ready: false, cpuUsageMilli: null }], now)[1]).toMatch(/NotReady .* – {3}/);
   });
 });

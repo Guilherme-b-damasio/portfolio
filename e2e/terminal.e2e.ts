@@ -218,3 +218,94 @@ test("clicking a finished command opens the trace of its request", async ({ home
   await run(home, "help");
   await expect(out.getByRole("button", { name: "ver o trace de help" })).toHaveCount(0);
 });
+
+test("kubectl get pods lays the cluster's pods out like kubectl", async ({ home }) => {
+  // CI runs outside a cluster, so the API answer is replayed here; the command and table are real.
+  await home.route("**/api/cluster/pods*", (route) =>
+    route.fulfill({
+      json: {
+        namespace: "portfolio",
+        readAt: "2026-10-17T12:00:00.000Z",
+        pods: [
+          {
+            namespace: "portfolio",
+            name: "portfolio-7d9f-abcde",
+            phase: "Running",
+            ready: "1/1",
+            restarts: 0,
+            node: "vps-1",
+            startedAt: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+            cpuUsageMilli: 3,
+            memoryUsageBytes: 64 * 2 ** 20,
+          },
+        ],
+      },
+    }),
+  );
+  await run(home, "kubectl get pods");
+  const out = home.locator("#term-out");
+  await expect(out).toContainText(/NAME\s+READY\s+STATUS\s+RESTARTS\s+AGE/);
+  await expect(out).toContainText(/portfolio-7d9f-abcde\s+1\/1\s+Running\s+0\s+3h\s+3m\s+64Mi/);
+  await expect(out).toContainText("cache de 5 s no servidor");
+});
+
+test("kubectl refuses anything but get, as the service account would", async ({ home }) => {
+  await run(home, "kubectl delete pod portfolio");
+  const out = home.locator("#term-out");
+  await expect(out).toContainText("kubectl delete: proibido");
+  await expect(out.getByRole("button", { name: "kubectl get pods" })).toBeVisible();
+});
+
+test("the cluster panel stays off outside a cluster", async ({ home }) => {
+  await expect(home.locator("#cluster-note")).toContainText("não está rodando no k3s");
+  await expect(home.locator("#cluster-pods-wrap")).toBeHidden();
+});
+
+test("the cluster panel shows the node against its capacity and every visible pod", async ({ home }) => {
+  // Replayed: CI has no cluster. The status keeps the real server's fields and only turns the cluster on.
+  await home.route("**/api/status", async (route) => {
+    const res = await route.fetch();
+    route.fulfill({ response: res, json: { ...(await res.json()), cluster: { namespaces: ["portfolio"] } } });
+  });
+  await home.route("**/api/cluster", (route) =>
+    route.fulfill({
+      json: {
+        namespaces: ["portfolio"],
+        readAt: new Date().toISOString(),
+        nodes: [
+          {
+            name: "vps-1",
+            ready: true,
+            kubeletVersion: "v1.33.4+k3s1",
+            createdAt: "2026-09-01T00:00:00Z",
+            cpuCapacityMilli: 2000,
+            memoryCapacityBytes: 4 * 2 ** 30,
+            cpuUsageMilli: 410,
+            memoryUsageBytes: 2 ** 30,
+          },
+        ],
+        pods: [
+          {
+            namespace: "portfolio",
+            name: "portfolio-7d9f-abcde",
+            phase: "Running",
+            ready: "1/1",
+            restarts: 1,
+            node: "vps-1",
+            startedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+            cpuUsageMilli: 3,
+            memoryUsageBytes: 64 * 2 ** 20,
+          },
+        ],
+      },
+    }),
+  );
+  await home.reload();
+  await expect(home.locator("#cluster-note")).toContainText("namespaces portfolio · só leitura");
+  await expect(home.locator("#cluster-nodes")).toContainText("410m de 2000m (21%)");
+  await expect(home.locator("#cluster-nodes")).toContainText("1.0Gi de 4.0Gi (25%)");
+  const row = home.locator("#cluster-pods tbody tr");
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText("portfolio/portfolio-7d9f-abcde");
+  await expect(row).toContainText("2d");
+});
