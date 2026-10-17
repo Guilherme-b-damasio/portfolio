@@ -163,6 +163,17 @@ Once a command finishes, its `$ ...` line turns into a link to the trace of the 
 (`public/js/api.js` records the `x-trace-id`s while it runs); commands that made several requests
 number them beside it, and ones that never reached the API, like `help`, stay plain text.
 
+## Cluster reader
+
+`ClusterReader` (`src/domain/cluster.ts`) is the read-only view of the cluster the site runs on:
+nodes, and pods in a whitelist of namespaces, with CPU and memory from metrics-server when it is
+installed. `KubernetesClusterReader` calls the API server with plain GETs and the pod's own service
+account (`inClusterGet`, which reads the rotated token on every call and caps each answer at 2 MB
+and 3 s); there is no client library. Namespaces outside the whitelist are refused before any call,
+and error messages never name the API server. `CachedClusterReader` keeps each answer for 5 s and
+shares the read in flight, so visitors cannot multiply the load on the API server. Tests run it
+against a fake API and a local HTTP server; it is not wired to a route yet.
+
 ## Deploy (k3s)
 
 Every push to `develop` builds the image and publishes it to
