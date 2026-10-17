@@ -910,6 +910,60 @@ a:hover {
   color: var(--color-muted);
 }
 
+/* ---------- cluster ---------- */
+.cluster-note {
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.nodes {
+  margin-top: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+}
+.nodes:empty {
+  display: none;
+}
+.node {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.node-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: baseline;
+}
+.node-ok {
+  color: var(--color-text);
+}
+.node-bad {
+  color: var(--color-accent-text);
+  font-weight: 600;
+}
+.gauge {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 2px var(--space-3);
+  align-items: center;
+  font-size: 12px;
+}
+.gauge-bar {
+  display: block;
+  height: 8px;
+  border: 1px solid var(--color-accent-soft);
+}
+.gauge-bar span {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+}
+.gauge .mono {
+  grid-column: 2;
+  color: var(--color-muted);
+}
+
 .table-title {
   margin-top: var(--space-8);
   font-family: var(--font-mono);

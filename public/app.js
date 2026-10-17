@@ -1,4 +1,5 @@
 import { api } from "./js/api.js";
+import { createClusterPanel } from "./js/cluster-panel.js";
 import { createDiagram } from "./js/diagram.js";
 import { el, icon } from "./js/dom.js";
 import { createLivePanel } from "./js/live.js";
@@ -168,13 +169,22 @@ const diagram = createDiagram({
   extra: [$("my-requests-diagram")],
   log: $("request-log"),
 });
+const cluster = createClusterPanel({
+  note: $("cluster-note"),
+  nodes: $("cluster-nodes"),
+  wrap: $("cluster-pods-wrap"),
+  pods: document.querySelector("#cluster-pods tbody"),
+});
 createLivePanel({
   facts: $("facts"),
   stats: $("stats"),
   routes: document.querySelector("#routes tbody"),
   lastRead: $("last-read"),
   footer: { build: $("build"), rest: $("build-rest") },
-  onStatus: (status) => diagram.setLlm(status.llm),
+  onStatus: (status) => {
+    diagram.setLlm(status.llm);
+    cluster.setStatus(status);
+  },
 });
 
 // ---------- pages ----------
