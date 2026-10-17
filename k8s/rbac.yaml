@@ -1,0 +1,65 @@
+# Read-only access for the cluster panel and `kubectl get` in the terminal
+# (src/infrastructure/cluster/kubernetes-cluster-reader.ts). GET and LIST only: no watch, no
+# secrets, no configmaps, no exec, no logs. Pods are readable only in the namespaces bound below,
+# which must match CLUSTER_NAMESPACES on the deployment; nodes are cluster-scoped, so they need a
+# ClusterRole. tests/k8s-rbac.test.ts keeps these rules in step with the paths the reader calls.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: portfolio
+  namespace: portfolio
+automountServiceAccountToken: false # mounted only by the pod that asks for it
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: portfolio-node-reader
+rules:
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, list]
+  - apiGroups: [metrics.k8s.io]
+    resources: [nodes]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: portfolio-node-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: portfolio-node-reader
+subjects:
+  - kind: ServiceAccount
+    name: portfolio
+    namespace: portfolio
+---
+# One Role and RoleBinding per visible namespace. To show another one, copy both into it and add it
+# to CLUSTER_NAMESPACES; without them the panel gets a 403 there and says RBAC is missing.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: portfolio-pod-reader
+  namespace: portfolio
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list]
+  - apiGroups: [metrics.k8s.io]
+    resources: [pods]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: portfolio-pod-reader
+  namespace: portfolio
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: portfolio-pod-reader
+subjects:
+  - kind: ServiceAccount
+    name: portfolio
+    namespace: portfolio
