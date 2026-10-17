@@ -10,8 +10,10 @@ import {
   formatUsd,
   guessCommand,
   highlightParts,
+  nodeRows,
   PAGES,
   parseLine,
+  podRows,
   rememberTurn,
   scanHeadline,
   scoreBar,
@@ -22,7 +24,8 @@ import {
   waterfallRows,
 } from "./lib.js";
 
-const COMMANDS = ["help", "whoami", "ls", "cat", "ask", "status", "trace", "scan", "curl", "open", "clear"];
+const COMMANDS = ["help", "whoami", "ls", "cat", "ask", "status", "kubectl", "trace", "scan", "curl", "open", "clear"];
+const KUBECTL_WORDS = [["get"], ["pods", "nodes"], ["-n", "-A"]]; // what Tab offers after `kubectl`, by position
 const OPENABLE = PAGES.filter((p) => p !== "inicio");
 const CHIPS = ["whoami", "ls projects", 'ask "como funciona o docsage?"', "status", "curl /api/projects", "help"];
 const isTodo = (text) => /^TODO\b/.test(text.trim());
@@ -104,6 +107,8 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ['ask --new "<pergunta>"', "esquece a conversa e começa outra"],
         ['ask --engine docsage "<pergunta>"', "busca no docsage em vez do índice local"],
         ["status", "métricas ao vivo deste servidor"],
+        ["kubectl get pods", "os pods do cluster agora (-n <ns> ou -A; só leitura)"],
+        ["kubectl get nodes", "o nó, com CPU e memória do metrics-server"],
         ["trace [id]", "cada etapa da última requisição (ou da do id)"],
         ["(clique num comando)", "abre o trace da requisição que ele fez"],
         ["scan", "o que este site sabe sobre você"],
@@ -362,6 +367,55 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
       print(...rows.map(([k, v]) => line([dim(k.padEnd(11)), v])));
     },
 
+    async kubectl(args) {
+      const [verb, kind, ...rest] = args;
+      const resource = { pods: "pods", pod: "pods", po: "pods", nodes: "nodes", node: "nodes", no: "nodes" }[kind];
+      if (verb !== "get" || !resource) {
+        return say(
+          warn("! "),
+          verb && verb !== "get"
+            ? `kubectl ${verb.slice(0, 20)}: proibido. A service account deste pod só tem get e list. `
+            : "uso: ",
+          runButton("kubectl get pods", "kubectl get pods"),
+          dim(" · "),
+          runButton("kubectl get nodes", "kubectl get nodes"),
+        );
+      }
+      const all = rest.includes("-A") || rest.includes("--all-namespaces");
+      const { value: namespace } = takeOption(rest, rest.includes("--namespace") ? "--namespace" : "-n");
+      const path =
+        resource === "nodes"
+          ? "/api/cluster/nodes"
+          : all
+            ? "/api/cluster"
+            : `/api/cluster/pods${namespace ? `?namespace=${encodeURIComponent(namespace)}` : ""}`;
+      const { res, body } = await api(path);
+      if (res.status === 403) {
+        return say(
+          warn("! 403 "),
+          `${body.error} `,
+          ...body.namespaces.flatMap((ns) => [runButton(ns, `kubectl get pods -n ${ns}`), " "]),
+        );
+      }
+      if (res.status === 503 && body?.error) return say(warn(body.off ? "! " : "! 503 "), body.error);
+      if (!res.ok) return failed(res.status);
+      const rows = resource === "nodes" ? nodeRows(body.nodes) : podRows(body.pods, { allNamespaces: all });
+      if (rows.length === 1)
+        return say(
+          dim(resource === "nodes" ? "nenhum nó" : `nenhum pod em ${body.namespace ?? "nenhum namespace visível"}`),
+        );
+      // Wide tables scroll inside the terminal instead of wrapping, so the columns stay aligned on a phone.
+      print(
+        el(
+          "div",
+          { class: "t-kube", attrs: { tabindex: "0", "aria-label": `kubectl get ${resource}` } },
+          line([dim(rows[0])]),
+          ...rows.slice(1).map((r) => line([r])),
+        ),
+      );
+      say(dim(`lido da API do cluster às ${body.readAt.slice(11, 19)} UTC · cache de 5 s no servidor`));
+    },
+
     async trace(args) {
       const id = args[0] ?? lastTraceId();
       if (!id) return say(warn("! "), "uso: trace <id> · o id vem no header x-trace-id de cada resposta da API");
@@ -599,13 +653,15 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
             ? projects.get()
             : words[0] === "ls"
               ? ["projects"]
-              : words[0] === "open"
-                ? OPENABLE
-                : words[0] === "ask" && words.length === 2
-                  ? ["--xray", "--new", "--engine"]
-                  : words[0] === "ask" && words[words.length - 2] === "--engine"
-                    ? ["docsage", "local"]
-                    : [];
+              : words[0] === "kubectl"
+                ? (KUBECTL_WORDS[words.length - 2] ?? [])
+                : words[0] === "open"
+                  ? OPENABLE
+                  : words[0] === "ask" && words.length === 2
+                    ? ["--xray", "--new", "--engine"]
+                    : words[0] === "ask" && words[words.length - 2] === "--engine"
+                      ? ["docsage", "local"]
+                      : [];
       const matches = pool.filter((c) => c.startsWith(words[words.length - 1]));
       if (!matches.length) return;
       if (matches.length === 1) {

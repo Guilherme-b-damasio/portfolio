@@ -574,6 +574,13 @@ a:hover {
   word-break: break-word;
   min-height: 1.6em;
 }
+.t-kube {
+  overflow-x: auto;
+}
+.t-kube .t-line {
+  white-space: pre;
+  width: max-content;
+}
 .t-gap {
   margin-top: 6px;
 }
