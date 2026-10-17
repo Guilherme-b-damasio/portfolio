@@ -89,7 +89,9 @@ Portuguese stemmer (`src/infrastructure/search/portuguese-stemmer.ts`), so "trab
 | `GET /api/scan`           | What the bare request gives away (try it with curl); never cached |
 | `POST /api/scan`          | Same, plus the browser probe from `/voce`: findings where the layers contradict each other. 10 per visitor per minute |
 | `GET /api/scan/tls-samples` | Real ClientHellos captured from known clients (`data/tls-samples/`), with JA4 and every byte annotated |
-| `GET /api/status`         | Uptime, memory, pod/node, p50/p95 per route, tokens spent today (`llmBudget`) |
+| `GET /api/status`         | Uptime, memory, pod/node, p50/p95 per route, tokens spent today (`llmBudget`), and `cluster: { namespaces }` when the pod can read its cluster |
+| `GET /api/cluster`        | Nodes (with CPU and memory against capacity) and the pods of every visible namespace, read from the Kubernetes API; 503 with `off: true` outside a cluster, 503 + `Retry-After` when the API server is out of reach |
+| `GET /api/cluster/nodes`, `GET /api/cluster/pods?namespace=` | The same, one kind at a time; a namespace outside the whitelist answers 403 with the visible ones |
 | `GET /api/status/history` | In-process samples every 5 min for the last 24h (reset on restart) |
 | `GET /api/traces/:id`     | One finished `/api` or `/mcp` request, step by step: route, status, total time and its spans (`retrieve`, `generate`) with offsets, durations and attributes. The id comes in each response's `x-trace-id`; the last 500 are kept in memory, 32 spans each. `trace [id]` in the terminal draws the waterfall |
 | `GET /metrics`            | Prometheus text format, including `portfolio_llm_tokens_used_today` |
@@ -172,7 +174,13 @@ account (`inClusterGet`, which reads the rotated token on every call and caps ea
 and 3 s); there is no client library. Namespaces outside the whitelist are refused before any call,
 and error messages never name the API server. `CachedClusterReader` keeps each answer for 5 s and
 shares the read in flight, so visitors cannot multiply the load on the API server. Tests run it
-against a fake API and a local HTTP server; it is not wired to a route yet.
+against a fake API and a local HTTP server.
+
+`InspectCluster` serves it at `/api/cluster`. In the terminal, `kubectl get pods [-n <ns>|-A]` and
+`kubectl get nodes` print it in kubectl's own columns (any other verb is refused, as the service
+account would), and the "Cluster" block under "Ao vivo" polls it every 15 s once `/api/status` says
+the cluster is on. The namespaces come from `CLUSTER_NAMESPACES` (comma-separated), falling back to
+the pod's own `POD_NAMESPACE`; outside a cluster both say so instead of failing.
 
 ## Deploy (k3s)
 
