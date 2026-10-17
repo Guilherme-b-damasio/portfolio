@@ -59,7 +59,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 - [x] Clicar num comando já executado no terminal abre o trace dele
 - [x] Porta `ClusterReader` + adapter da API do Kubernetes (só leitura, whitelist de namespaces) + fake para testes
 - [x] `kubectl get pods` e painel "Cluster": node, pods, CPU/memória (metrics-server), restarts, idade
-- [ ] Manifests de RBAC só leitura em `deploy/` (Role/ClusterRole mínimos)
+- [x] Manifests de RBAC só leitura em `k8s/rbac.yaml` (Role/ClusterRole mínimos), ao lado dos outros manifests
 - [x] Ring buffer de 24h das métricas no processo, com sparklines no painel "Ao vivo"
 - [ ] `deploys`: linha do tempo commit → imagem → Flux → pod pronto (API do GitHub + eventos do cluster)
 

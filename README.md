@@ -192,3 +192,9 @@ its timestamp and rolls the deployment, so there is no manual `kubectl apply`.
 `k8s/deployment.yaml` is a generic reference (namespace, deployment, service, ingress). The
 real manifests, host and TLS issuer live in the private infra repository. Without the
 optional `portfolio-secrets` secret the app runs retrieval-only.
+
+`k8s/rbac.yaml` gives the pod its read-only view of the cluster: a `portfolio` service account, a
+ClusterRole to get and list nodes (and their metrics-server usage), and a Role per visible namespace
+to get and list pods. No watch, no secrets, no logs, no exec. Each namespace in `CLUSTER_NAMESPACES`
+needs its own Role and RoleBinding; `tests/k8s-rbac.test.ts` fails if a rule ever grants more than
+get/list or stops covering a path the reader calls.
