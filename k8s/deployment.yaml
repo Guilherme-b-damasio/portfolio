@@ -22,6 +22,9 @@ spec:
         prometheus.io/port: "3000"
         prometheus.io/path: /metrics
     spec:
+      # Read-only API access for the cluster panel (k8s/rbac.yaml); the token is rotated by the kubelet.
+      serviceAccountName: portfolio
+      automountServiceAccountToken: true
       securityContext: { runAsNonRoot: true, runAsUser: 1000 }
       containers:
         - name: web
@@ -34,6 +37,8 @@ spec:
               valueFrom: { fieldRef: { fieldPath: metadata.namespace } }
             - name: NODE_NAME
               valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
+            - name: CLUSTER_NAMESPACES # must match the Roles in k8s/rbac.yaml
+              value: portfolio
             - name: ANTHROPIC_API_KEY
               valueFrom: { secretKeyRef: { name: portfolio-secrets, key: anthropic-api-key, optional: true } }
           readinessProbe:
