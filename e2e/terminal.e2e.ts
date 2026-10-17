@@ -218,3 +218,40 @@ test("clicking a finished command opens the trace of its request", async ({ home
   await run(home, "help");
   await expect(out.getByRole("button", { name: "ver o trace de help" })).toHaveCount(0);
 });
+
+test("kubectl get pods lays the cluster's pods out like kubectl", async ({ home }) => {
+  // CI runs outside a cluster, so the API answer is replayed here; the command and table are real.
+  await home.route("**/api/cluster/pods*", (route) =>
+    route.fulfill({
+      json: {
+        namespace: "portfolio",
+        readAt: "2026-10-17T12:00:00.000Z",
+        pods: [
+          {
+            namespace: "portfolio",
+            name: "portfolio-7d9f-abcde",
+            phase: "Running",
+            ready: "1/1",
+            restarts: 0,
+            node: "vps-1",
+            startedAt: new Date(Date.now() - 3 * 3_600_000).toISOString(),
+            cpuUsageMilli: 3,
+            memoryUsageBytes: 64 * 2 ** 20,
+          },
+        ],
+      },
+    }),
+  );
+  await run(home, "kubectl get pods");
+  const out = home.locator("#term-out");
+  await expect(out).toContainText(/NAME\s+READY\s+STATUS\s+RESTARTS\s+AGE/);
+  await expect(out).toContainText(/portfolio-7d9f-abcde\s+1\/1\s+Running\s+0\s+3h\s+3m\s+64Mi/);
+  await expect(out).toContainText("cache de 5 s no servidor");
+});
+
+test("kubectl refuses anything but get, as the service account would", async ({ home }) => {
+  await run(home, "kubectl delete pod portfolio");
+  const out = home.locator("#term-out");
+  await expect(out).toContainText("kubectl delete: proibido");
+  await expect(out.getByRole("button", { name: "kubectl get pods" })).toBeVisible();
+});
