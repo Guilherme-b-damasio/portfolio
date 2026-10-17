@@ -336,3 +336,74 @@ export function formatAttrs(attrs) {
     .map(([k, v]) => `${k}=${v}`)
     .join(" ");
 }
+
+/** kubectl's AGE column: "45s", "12m", "3h", "5d" (the largest unit that fits, rounded down). */
+export function kubeAge(iso, now = Date.now()) {
+  if (!iso) return "<unknown>";
+  const s = Math.max(0, Math.floor((now - Date.parse(iso)) / 1000));
+  if (s < 120) return `${s}s`;
+  if (s < 7200) return `${Math.floor(s / 60)}m`;
+  if (s < 172800) return `${Math.floor(s / 3600)}h`;
+  return `${Math.floor(s / 86400)}d`;
+}
+
+/** Usage as `kubectl top` prints it: "410m" CPU, "64Mi" memory; "–" without metrics-server. */
+export const formatMilli = (milli) => (milli == null ? "–" : `${milli}m`);
+export function formatMi(bytes) {
+  if (bytes == null) return "–";
+  const mi = bytes / 2 ** 20;
+  return mi >= 1024 ? `${(mi / 1024).toFixed(1)}Gi` : `${Math.round(mi)}Mi`;
+}
+
+/** Share of a capacity as a whole percent, or null when either side is unknown. */
+export const percentOf = (used, capacity) => (used == null || !capacity ? null : Math.round((used / capacity) * 100));
+
+/** Columns padded the way kubectl lays them out: each as wide as its longest cell, three spaces apart. */
+export function kubeTable(headers, rows) {
+  const widths = headers.map((h, i) => Math.max(h.length, ...rows.map((r) => String(r[i]).length)));
+  const lay = (cells) =>
+    cells
+      .map((c, i) => (i === cells.length - 1 ? String(c) : String(c).padEnd(widths[i] + 3)))
+      .join("")
+      .trimEnd();
+  return [lay(headers), ...rows.map(lay)];
+}
+
+/** `kubectl get pods` rows, with the namespace first under -A. */
+export function podRows(pods, { allNamespaces = false, now = Date.now() } = {}) {
+  const headers = ["NAME", "READY", "STATUS", "RESTARTS", "AGE", "CPU", "MEMORY"];
+  const rows = pods.map((p) => [
+    p.name,
+    p.ready,
+    p.phase,
+    String(p.restarts),
+    kubeAge(p.startedAt, now),
+    formatMilli(p.cpuUsageMilli),
+    formatMi(p.memoryUsageBytes),
+  ]);
+  return allNamespaces
+    ? kubeTable(
+        ["NAMESPACE", ...headers],
+        rows.map((r, i) => [pods[i].namespace, ...r]),
+      )
+    : kubeTable(headers, rows);
+}
+
+/** `kubectl get nodes` rows, with usage beside capacity when metrics-server answers. */
+export function nodeRows(nodes, now = Date.now()) {
+  return kubeTable(
+    ["NAME", "STATUS", "AGE", "VERSION", "CPU", "MEMORY"],
+    nodes.map((n) => {
+      const cpu = percentOf(n.cpuUsageMilli, n.cpuCapacityMilli);
+      const mem = percentOf(n.memoryUsageBytes, n.memoryCapacityBytes);
+      return [
+        n.name,
+        n.ready ? "Ready" : "NotReady",
+        kubeAge(n.createdAt, now),
+        n.kubeletVersion,
+        cpu == null ? "–" : `${formatMilli(n.cpuUsageMilli)} (${cpu}%)`,
+        mem == null ? "–" : `${formatMi(n.memoryUsageBytes)} (${mem}%)`,
+      ];
+    }),
+  );
+}
