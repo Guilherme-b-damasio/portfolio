@@ -1,4 +1,4 @@
-# Briefing de design: portfólio do Guilherme Damasio
+# Briefing de design: portfólio do Guilherme Boeira
 
 Este documento é para quem vai desenhar o site. Ele descreve o que existe hoje, os dados
 reais que cada parte mostra, o que vem pela frente e as restrições técnicas que o design

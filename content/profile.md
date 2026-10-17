@@ -1,5 +1,5 @@
 ---
-name: Guilherme Damasio
+name: Guilherme Boeira
 fullName: Guilherme Boeira Damasio
 handle: guilherme
 role: Backend · Infra · IA
