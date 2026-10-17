@@ -4,6 +4,7 @@ import type { BudgetUsage, TokenBudget } from "../domain/token-budget.js";
 export interface Status extends MetricsSnapshot {
   llm: string | null;
   llmBudget: BudgetUsage | null;
+  cluster: { namespaces: readonly string[] } | null; // null outside a cluster: the panel stays off
 }
 
 export interface StatusHistory {
@@ -18,10 +19,16 @@ export class ReportStatus {
     private readonly llmModel: string | null,
     private readonly metricsHistory: MetricsHistory,
     private readonly budget: TokenBudget | null = null,
+    private readonly clusterNamespaces: readonly string[] | null = null,
   ) {}
 
   status(): Status {
-    return { ...this.metrics.snapshot(), llm: this.llmModel, llmBudget: this.budget?.usage() ?? null };
+    return {
+      ...this.metrics.snapshot(),
+      llm: this.llmModel,
+      llmBudget: this.budget?.usage() ?? null,
+      cluster: this.clusterNamespaces ? { namespaces: this.clusterNamespaces } : null,
+    };
   }
 
   history(): StatusHistory {
