@@ -668,6 +668,22 @@ a:hover {
 .t-btn {
   white-space: pre;
 }
+.t-cmd {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline dotted var(--term-dim);
+  text-underline-offset: 3px;
+}
+.t-cmd:hover,
+.t-cmd:focus-visible {
+  color: var(--term-accent);
+  text-decoration-style: solid;
+}
 .t-btn:hover {
   text-decoration: underline;
 }
