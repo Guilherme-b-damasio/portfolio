@@ -255,3 +255,57 @@ test("kubectl refuses anything but get, as the service account would", async ({ 
   await expect(out).toContainText("kubectl delete: proibido");
   await expect(out.getByRole("button", { name: "kubectl get pods" })).toBeVisible();
 });
+
+test("the cluster panel stays off outside a cluster", async ({ home }) => {
+  await expect(home.locator("#cluster-note")).toContainText("não está rodando no k3s");
+  await expect(home.locator("#cluster-pods-wrap")).toBeHidden();
+});
+
+test("the cluster panel shows the node against its capacity and every visible pod", async ({ home }) => {
+  // Replayed: CI has no cluster. The status keeps the real server's fields and only turns the cluster on.
+  await home.route("**/api/status", async (route) => {
+    const res = await route.fetch();
+    route.fulfill({ response: res, json: { ...(await res.json()), cluster: { namespaces: ["portfolio"] } } });
+  });
+  await home.route("**/api/cluster", (route) =>
+    route.fulfill({
+      json: {
+        namespaces: ["portfolio"],
+        readAt: new Date().toISOString(),
+        nodes: [
+          {
+            name: "vps-1",
+            ready: true,
+            kubeletVersion: "v1.33.4+k3s1",
+            createdAt: "2026-09-01T00:00:00Z",
+            cpuCapacityMilli: 2000,
+            memoryCapacityBytes: 4 * 2 ** 30,
+            cpuUsageMilli: 410,
+            memoryUsageBytes: 2 ** 30,
+          },
+        ],
+        pods: [
+          {
+            namespace: "portfolio",
+            name: "portfolio-7d9f-abcde",
+            phase: "Running",
+            ready: "1/1",
+            restarts: 1,
+            node: "vps-1",
+            startedAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+            cpuUsageMilli: 3,
+            memoryUsageBytes: 64 * 2 ** 20,
+          },
+        ],
+      },
+    }),
+  );
+  await home.reload();
+  await expect(home.locator("#cluster-note")).toContainText("namespaces portfolio · só leitura");
+  await expect(home.locator("#cluster-nodes")).toContainText("410m de 2000m (21%)");
+  await expect(home.locator("#cluster-nodes")).toContainText("1.0Gi de 4.0Gi (25%)");
+  const row = home.locator("#cluster-pods tbody tr");
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText("portfolio/portfolio-7d9f-abcde");
+  await expect(row).toContainText("2d");
+});
