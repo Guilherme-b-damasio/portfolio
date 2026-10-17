@@ -159,6 +159,9 @@ answers with its random id in `x-trace-id`. Use cases time their steps as spans 
 Attributes are set by code, never copied from what the visitor sent. Finished traces live in a ring
 buffer of 500, so `GET /api/traces/:id` works for a few hundred requests and then answers 404. Each
 answer in the terminal ends with a `trace` link, and `trace` alone opens the last request you made.
+Once a command finishes, its `$ ...` line turns into a link to the trace of the request it made
+(`public/js/api.js` records the `x-trace-id`s while it runs); commands that made several requests
+number them beside it, and ones that never reached the API, like `help`, stay plain text.
 
 ## Deploy (k3s)
 

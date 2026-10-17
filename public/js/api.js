@@ -8,6 +8,22 @@ let lastTrace = null;
 export const lastTraceId = () => lastTrace;
 
 /**
+ * Collects the x-trace-id of every request the visitor triggers from now on. The returned function
+ * stops listening and gives the ids in order, so a terminal command can link to its own traces.
+ */
+export function recordTraces() {
+  const ids = [];
+  const listen = ({ detail }) => {
+    if (!detail.auto && detail.traceId && !ids.includes(detail.traceId)) ids.push(detail.traceId);
+  };
+  requests.addEventListener("request", listen);
+  return () => {
+    requests.removeEventListener("request", listen);
+    return ids;
+  };
+}
+
+/**
  * fetch() plus timing. `auto: true` marks requests the page makes on its own (polling, first load),
  * as opposed to ones the visitor triggered, so the requests panel can hide them.
  */

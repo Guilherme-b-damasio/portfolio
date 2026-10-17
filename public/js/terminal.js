@@ -1,4 +1,4 @@
-import { api, apiStream, lastTraceId } from "./api.js";
+import { api, apiStream, lastTraceId, recordTraces } from "./api.js";
 import { el } from "./dom.js";
 import { collectProbe } from "./probe.js";
 import {
@@ -105,6 +105,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ['ask --engine docsage "<pergunta>"', "busca no docsage em vez do índice local"],
         ["status", "métricas ao vivo deste servidor"],
         ["trace [id]", "cada etapa da última requisição (ou da do id)"],
+        ["(clique num comando)", "abre o trace da requisição que ele fez"],
         ["scan", "o que este site sabe sobre você"],
         ["curl <caminho>", "chama a API crua, ex: curl /api/profile"],
         ["open <página>", OPENABLE.join(" · ")],
@@ -524,7 +525,8 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
     if (!trimmed || busy) return;
     history.push(trimmed);
     historyIndex = history.length;
-    say(acc("$ "), trimmed);
+    const echo = line([acc("$ "), trimmed]);
+    print(echo);
 
     const [name, ...args] = parseLine(trimmed);
     const command = commands[name.toLowerCase()];
@@ -535,13 +537,43 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
       return;
     }
     busy = true;
+    const stop = recordTraces();
     try {
       await command(args);
     } catch {
       failed(0);
     } finally {
       busy = false;
+      linkTraces(echo, trimmed, stop());
     }
+  }
+
+  // Once a command finished, its echo line opens the trace of the request it made (the last one,
+  // with the earlier ones numbered beside it). Commands that never reached the API stay plain text.
+  function linkTraces(echo, command, ids) {
+    if (!ids.length) return;
+    const last = ids[ids.length - 1];
+    const open = el(
+      "button",
+      {
+        type: "button",
+        class: "t-cmd",
+        title: "ver o trace deste comando",
+        attrs: { "aria-label": `ver o trace de ${command}` },
+        on: { click: () => run(`trace ${last}`) },
+      },
+      command,
+    );
+    const earlier =
+      ids.length > 1
+        ? [
+            dim("  traces "),
+            ...ids
+              .map((id, i) => runButton(`#${i + 1}`, `trace ${id}`, `trace ${i + 1} de ${ids.length}`))
+              .flatMap((b) => [b, " "]),
+          ]
+        : [];
+    echo.replaceChildren(acc("$ "), open, ...earlier);
   }
 
   // ---------- input ----------
