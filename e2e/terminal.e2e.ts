@@ -206,3 +206,15 @@ test("trace shows the waterfall of the answer it came from", async ({ home }) =>
   const overflow = await home.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test("clicking a finished command opens the trace of its request", async ({ home }) => {
+  await run(home, "status");
+  const out = home.locator("#term-out");
+  await expect(out).toContainText("uptime");
+  await out.getByRole("button", { name: "ver o trace de status" }).click();
+  await expect(out).toContainText(/trace [0-9a-f]{16} · 200/);
+  await expect(out).toContainText("GET /api/status");
+  // help never reaches the API, so its echo stays plain text.
+  await run(home, "help");
+  await expect(out.getByRole("button", { name: "ver o trace de help" })).toHaveCount(0);
+});
