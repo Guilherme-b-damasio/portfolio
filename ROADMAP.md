@@ -64,7 +64,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 - [ ] `deploys`: linha do tempo commit → imagem → Flux → pod pronto (API do GitHub + eventos do cluster)
   - [x] Porta `BuildHistory` + adapter das execuções do workflow `Image` na `develop` (API pública, sem token),
         com cache de 5 min para ficar longe do limite anônimo do GitHub
-  - [ ] Porta `RolloutHistory`: ReplicaSets do deployment (imagem, revisão, criação) e quando o pod ficou Ready,
+  - [x] Porta `RolloutHistory`: ReplicaSets do deployment (imagem, revisão, criação) e quando o pod ficou Ready,
         com o RBAC só leitura correspondente
   - [ ] Caso de uso que junta build e rollout pelo sha, `/api/deploys` e comando `deploys` no terminal
   - [ ] Eventos do Flux (`ImagePolicy`/`ImageUpdateAutomation`) para marcar quando a tag nova foi escolhida

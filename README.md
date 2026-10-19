@@ -195,6 +195,6 @@ optional `portfolio-secrets` secret the app runs retrieval-only.
 
 `k8s/rbac.yaml` gives the pod its read-only view of the cluster: a `portfolio` service account, a
 ClusterRole to get and list nodes (and their metrics-server usage), and a Role per visible namespace
-to get and list pods. No watch, no secrets, no logs, no exec. Each namespace in `CLUSTER_NAMESPACES`
+to get and list pods (plus the deployment's ReplicaSets in its own namespace, for `deploys`). No watch, no secrets, no logs, no exec. Each namespace in `CLUSTER_NAMESPACES`
 needs its own Role and RoleBinding; `tests/k8s-rbac.test.ts` fails if a rule ever grants more than
 get/list or stops covering a path the reader calls.
