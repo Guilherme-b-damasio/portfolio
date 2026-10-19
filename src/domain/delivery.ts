@@ -22,3 +22,19 @@ export interface BuildHistory {
 export class DeliveryUnavailable extends Error {
   override name = "DeliveryUnavailable";
 }
+
+/** One revision of the deployment: the ReplicaSet a rollout created, and when its pod came up. */
+export interface RolloutView {
+  revision: number;
+  image: string;
+  sha: string | null; // the short sha in a `<timestamp>-<sha>` tag; null for any other tag
+  startedAt: string | null; // when the ReplicaSet was created, i.e. when the new image was applied
+  readyAt: string | null; // when its newest pod turned Ready; null once the revision is scaled away
+  replicas: string; // ready/desired, as kubectl prints it
+  current: boolean; // the newest revision, the one the deployment asks for now
+}
+
+/** The deployment's recent revisions, newest first. Read-only. */
+export interface RolloutHistory {
+  rollouts(): Promise<RolloutView[]>;
+}

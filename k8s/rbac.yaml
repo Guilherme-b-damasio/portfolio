@@ -1,5 +1,6 @@
 # Read-only access for the cluster panel and `kubectl get` in the terminal
-# (src/infrastructure/cluster/kubernetes-cluster-reader.ts). GET and LIST only: no watch, no
+# (src/infrastructure/cluster/kubernetes-cluster-reader.ts), and the deploys timeline
+# (kubernetes-rollout-history.ts). GET and LIST only: no watch, no
 # secrets, no configmaps, no exec, no logs. Pods are readable only in the namespaces bound below,
 # which must match CLUSTER_NAMESPACES on the deployment; nodes are cluster-scoped, so they need a
 # ClusterRole. tests/k8s-rbac.test.ts keeps these rules in step with the paths the reader calls.
@@ -48,6 +49,10 @@ rules:
     verbs: [get, list]
   - apiGroups: [metrics.k8s.io]
     resources: [pods]
+    verbs: [get, list]
+  # The deployment's revisions for `deploys` (kubernetes-rollout-history.ts).
+  - apiGroups: [apps]
+    resources: [replicasets]
     verbs: [get, list]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

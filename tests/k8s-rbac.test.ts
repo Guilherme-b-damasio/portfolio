@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { KubernetesClusterReader } from "../src/infrastructure/cluster/kubernetes-cluster-reader.js";
+import { KubernetesRolloutHistory } from "../src/infrastructure/cluster/kubernetes-rollout-history.js";
 
 // Keeps k8s/rbac.yaml read-only and in step with the API paths the cluster reader actually calls.
 const k8s = path.resolve(import.meta.dirname, "..", "k8s");
@@ -62,23 +63,26 @@ describe("k8s/rbac.yaml", () => {
     expect(all.length).toBeGreaterThan(0);
     for (const rule of all) {
       expect(rule.verbs.every((v) => v === "get" || v === "list")).toBe(true);
-      expect(rule.resources.every((r) => r === "nodes" || r === "pods")).toBe(true);
+      expect(rule.resources.every((r) => ["nodes", "pods", "replicasets"].includes(r))).toBe(true);
       expect(rule.group).not.toBe("*");
     }
   });
 
-  it("grants every path the cluster reader calls, nodes cluster-wide and pods per namespace", async () => {
+  it("grants every path the cluster readers call, nodes cluster-wide and the rest per namespace", async () => {
     const calls: string[] = [];
-    const reader = new KubernetesClusterReader(
-      async (apiPath) => {
-        calls.push(apiPath);
-        return { items: [] };
-      },
-      { namespaces: ["portfolio"] },
-    );
+    const get = async (apiPath: string) => {
+      calls.push(apiPath);
+      return { items: [] };
+    };
+    const reader = new KubernetesClusterReader(get, { namespaces: ["portfolio"] });
     await reader.nodes();
     await reader.pods("portfolio");
-    expect(calls).toHaveLength(4);
+    await new KubernetesRolloutHistory(get, {
+      namespace: "portfolio",
+      deployment: "portfolio",
+      selector: "app=portfolio",
+    }).rollouts();
+    expect(calls).toHaveLength(6);
     for (const call of calls) {
       const need = needOf(call);
       const granted = rules().some(
