@@ -41,6 +41,8 @@ Portuguese stemmer (`src/infrastructure/search/portuguese-stemmer.ts`), so "trab
 | `ASK_TIMEOUT_MS`    | `60000`           | Generation for one question is aborted past this; a visitor who disconnects aborts it too |
 | `DOCSAGE_MCP_URL`  | unset             | docsage's MCP endpoint (Streamable HTTP, e.g. `http://docsage:8765/mcp`). Turns on `ask --engine docsage` |
 | `DOCSAGE_TIMEOUT_MS` | `2000`          | One docsage search, connection included; past it the question is answered from the local index |
+| `DEPLOYS_REPO`      | `Guilherme-b-damasio/portfolio` | Public repository whose `Image` workflow runs feed `deploys`; `off` skips GitHub |
+| `DEPLOYS_DEPLOYMENT` | `portfolio`     | Deployment (and `app=` label) whose ReplicaSets are the revisions in `deploys` |
 | `GIT_SHA`, `BUILT_AT` | `dev`           | Shown in the footer and `/api/status` (set as Docker build args) |
 | `RESEND_API_KEY`, `CONTACT_TO` | unset | Turn on the contact form; messages go to `CONTACT_TO` through Resend |
 | `CONTACT_FROM`      | `onboarding@resend.dev` | Sender shown in the e-mail (needs a verified domain on Resend to change) |
@@ -92,6 +94,7 @@ Portuguese stemmer (`src/infrastructure/search/portuguese-stemmer.ts`), so "trab
 | `GET /api/status`         | Uptime, memory, pod/node, p50/p95 per route, tokens spent today (`llmBudget`), and `cluster: { namespaces }` when the pod can read its cluster |
 | `GET /api/cluster`        | Nodes (with CPU and memory against capacity) and the pods of every visible namespace, read from the Kubernetes API; 503 with `off: true` outside a cluster, 503 + `Retry-After` when the API server is out of reach |
 | `GET /api/cluster/nodes`, `GET /api/cluster/pods?namespace=` | The same, one kind at a time; a namespace outside the whitelist answers 403 with the visible ones |
+| `GET /api/deploys`       | The last pushes to `develop`, each from commit to image build (GitHub Actions) to rollout (the ReplicaSet Flux's change created) to pod Ready. Always 200: `sources.github` and `sources.cluster` say on their own whether they answered (`ok`, `off` or `unavailable` with a safe `error`) |
 | `GET /api/status/history` | In-process samples every 5 min for the last 24h (reset on restart) |
 | `GET /api/traces/:id`     | One finished `/api` or `/mcp` request, step by step: route, status, total time and its spans (`retrieve`, `generate`) with offsets, durations and attributes. The id comes in each response's `x-trace-id`; the last 500 are kept in memory, 32 spans each. `trace [id]` in the terminal draws the waterfall |
 | `GET /metrics`            | Prometheus text format, including `portfolio_llm_tokens_used_today` |
@@ -181,6 +184,24 @@ against a fake API and a local HTTP server.
 account would), and the "Cluster" block under "Ao vivo" polls it every 15 s once `/api/status` says
 the cluster is on. The namespaces come from `CLUSTER_NAMESPACES` (comma-separated), falling back to
 the pod's own `POD_NAMESPACE`; outside a cluster both say so instead of failing.
+
+## Deploys timeline
+
+`deploys` in the terminal follows each push to `develop` on its way to production: commit → image
+→ Flux → pod Ready, with the wait at each stage. Two read-only sources meet on the sha in the image
+tag (`<YYYYMMDDHHmmss>-<sha>`):
+
+- `GitHubBuildHistory` reads the runs of the `Image` workflow on `develop` from the public GitHub
+  API, without a token: one call per read, 3 s timeout, 500 KB cap. `CachedBuildHistory` keeps the
+  answer for 5 minutes, so the server stays far below GitHub's 60 anonymous calls an hour.
+- `KubernetesRolloutHistory` lists the deployment's ReplicaSets (one per revision, as many as
+  `revisionHistoryLimit` keeps) and its pods' Ready transitions, with the same service account as
+  the cluster reader. `CachedRolloutHistory` keeps it for 10 s.
+
+`TraceDeploys` joins them, and either source can fail on its own: outside a cluster the timeline
+still shows the builds, and with GitHub rate-limited it still shows the revisions. `DEPLOYS_REPO`
+(`owner/name`, default this repository; `off` to skip GitHub) and `DEPLOYS_DEPLOYMENT` (default
+`portfolio`, also used as the `app=` label) point it elsewhere.
 
 ## Deploy (k3s)
 

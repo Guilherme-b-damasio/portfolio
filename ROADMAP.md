@@ -66,7 +66,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
         com cache de 5 min para ficar longe do limite anônimo do GitHub
   - [x] Porta `RolloutHistory`: ReplicaSets do deployment (imagem, revisão, criação) e quando o pod ficou Ready,
         com o RBAC só leitura correspondente
-  - [ ] Caso de uso que junta build e rollout pelo sha, `/api/deploys` e comando `deploys` no terminal
+  - [x] Caso de uso que junta build e rollout pelo sha, `/api/deploys` e comando `deploys` no terminal
   - [ ] Eventos do Flux (`ImagePolicy`/`ImageUpdateAutomation`) para marcar quando a tag nova foi escolhida
 
 ## 0.4 Playgrounds
