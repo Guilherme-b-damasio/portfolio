@@ -10,6 +10,7 @@ import type { ReportStatus } from "../../application/report-status.js";
 import type { SendContact } from "../../application/send-contact.js";
 import type { ShowEvals } from "../../application/show-evals.js";
 import type { ShowTrace } from "../../application/show-trace.js";
+import type { TraceDeploys } from "../../application/trace-deploys.js";
 import type { Logger } from "../../domain/logger.js";
 import type { TappedConnections } from "../../domain/tls.js";
 import { concurrencyCap, ConcurrencyGate } from "../middleware/concurrency.js";
@@ -34,6 +35,7 @@ export interface ApiDeps {
   showEvals?: ShowEvals | null; // the retrieval eval at /api/evals; off without an eval set
   showTrace?: ShowTrace | null; // finished traces at /api/traces/:id; off without a trace store
   inspectCluster?: InspectCluster | null; // /api/cluster; without one it answers that the cluster is off
+  traceDeploys?: TraceDeploys | null; // /api/deploys; both of its sources are cached upstream
 }
 
 // A follow-up carries the last turns from the browser. Capped here so a visitor cannot inflate the prompt.
@@ -79,6 +81,7 @@ export function apiRouter(
     showEvals,
     showTrace,
     inspectCluster,
+    traceDeploys,
   }: ApiDeps,
   logger: Logger,
   { bucket: askBucket, gate: askGate }: AskGuards,
@@ -206,6 +209,19 @@ export function apiRouter(
     });
 
   if (inspectCluster) api.use("/cluster", clusterRouter(inspectCluster));
+
+  // commit → image → rollout → pod Ready. Always 200: each source says on its own whether it answered.
+  api.get("/deploys", async (_req, res, next) => {
+    if (!traceDeploys) {
+      res.status(503).json({ error: "a linha do tempo de deploys está desligada neste servidor", off: true });
+      return;
+    }
+    try {
+      res.json({ ...(await traceDeploys.timeline()), readAt: new Date().toISOString() });
+    } catch (err) {
+      next(err);
+    }
+  });
   api.use("/contact", contactRouter(sendContact, logger));
   if (showEvals) api.use("/evals", evalsRouter(showEvals));
   api.use("/scan", scanRouter(inspectVisitor, tapped ?? null, tlsSamples ?? null));

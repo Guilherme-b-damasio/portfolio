@@ -15,11 +15,16 @@ import { ReportStatus } from "./application/report-status.js";
 import { SendContact } from "./application/send-contact.js";
 import { ShowEvals } from "./application/show-evals.js";
 import { ShowTrace } from "./application/show-trace.js";
+import { TraceDeploys } from "./application/trace-deploys.js";
 import { createApp } from "./http/app.js";
 import { MAX_TURNS } from "./http/routes/api.js";
 import { CachedClusterReader } from "./infrastructure/cluster/cached-cluster-reader.js";
+import { CachedRolloutHistory } from "./infrastructure/cluster/cached-rollout-history.js";
 import { inClusterGet } from "./infrastructure/cluster/in-cluster-get.js";
 import { KubernetesClusterReader } from "./infrastructure/cluster/kubernetes-cluster-reader.js";
+import { KubernetesRolloutHistory } from "./infrastructure/cluster/kubernetes-rollout-history.js";
+import { CachedBuildHistory } from "./infrastructure/delivery/cached-build-history.js";
+import { GitHubBuildHistory, gitHubGet } from "./infrastructure/delivery/github-build-history.js";
 import { MarkdownContentSource } from "./infrastructure/content/markdown-content-source.js";
 import { loadEvalSet } from "./infrastructure/evals/json-eval-set.js";
 import { JsonLogger } from "./infrastructure/logging/json-logger.js";
@@ -85,6 +90,22 @@ const clusterNamespaces = (process.env.CLUSTER_NAMESPACES ?? process.env.POD_NAM
 const clusterReader = kubeGet
   ? new CachedClusterReader(new KubernetesClusterReader(kubeGet, { namespaces: clusterNamespaces }))
   : null;
+// `deploys`: the image builds come from this public repository's Actions runs (no token), the
+// rollouts from the deployment's ReplicaSets in the pod's own namespace. DEPLOYS_REPO=off skips GitHub.
+const deploysRepo = process.env.DEPLOYS_REPO ?? "Guilherme-b-damasio/portfolio";
+const deployment = process.env.DEPLOYS_DEPLOYMENT ?? "portfolio";
+const buildHistory =
+  deploysRepo === "off" ? null : new CachedBuildHistory(new GitHubBuildHistory(gitHubGet(), { repo: deploysRepo }));
+const rolloutHistory = kubeGet
+  ? new CachedRolloutHistory(
+      new KubernetesRolloutHistory(kubeGet, {
+        namespace: process.env.POD_NAMESPACE ?? clusterNamespaces[0] ?? "portfolio",
+        deployment,
+        selector: `app=${deployment}`,
+        container: "web",
+      }),
+    )
+  : null;
 const tap = certFile && keyFile ? new TlsTap({ proxyProtocol: process.env.TLS_PROXY_PROTOCOL === "1" }) : null;
 
 const app = createApp({
@@ -111,6 +132,7 @@ const app = createApp({
   traces,
   showTrace: new ShowTrace(traces),
   inspectCluster: new InspectCluster(clusterReader),
+  traceDeploys: new TraceDeploys(buildHistory, rolloutHistory),
   publicDir: path.join(root, "public"),
   // Questions per visitor: a bucket this size that refills at the same rate per minute.
   askLimit: { capacity: askRate, refillPerMinute: askRate },
