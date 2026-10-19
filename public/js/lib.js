@@ -407,3 +407,59 @@ export function nodeRows(nodes, now = Date.now()) {
     }),
   );
 }
+
+/** A wait between two stages: "45s", "3m12s", "2h05m". Null when either end is unknown. */
+export function formatGap(fromIso, toIso) {
+  if (!fromIso || !toIso) return null;
+  const s = Math.max(0, Math.round((Date.parse(toIso) - Date.parse(fromIso)) / 1000));
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m${String(s % 60).padStart(2, "0")}s`;
+  return `${Math.floor(s / 3600)}h${String(Math.floor((s % 3600) / 60)).padStart(2, "0")}m`;
+}
+
+/**
+ * The four stages of one deploy as `deploys` prints them: commit → image → flux → pod. Each has a
+ * state (done, failed, running, waiting, replaced, unknown) and how long it took after the one before.
+ */
+export function deployStages({ committedAt, build, rollout }) {
+  const plus = (from, to) => {
+    const gap = formatGap(from, to);
+    return gap ? `+${gap}` : "";
+  };
+  const image = !build
+    ? { state: "unknown", detail: "fora da janela do GitHub" }
+    : build.status === "success"
+      ? { state: "done", detail: formatGap(build.startedAt, build.finishedAt) ?? "" }
+      : build.status === "running" || build.status === "queued"
+        ? { state: "running", detail: build.status === "queued" ? "na fila" : "construindo" }
+        : { state: "failed", detail: build.status === "cancelled" ? "cancelado" : "falhou" };
+  const flux = rollout
+    ? { state: "done", detail: `rev ${rollout.revision} ${plus(build?.finishedAt, rollout.startedAt)}`.trim() }
+    : image.state === "done"
+      ? { state: "waiting", detail: "aguardando o Flux" }
+      : { state: image.state === "failed" ? "skipped" : "unknown", detail: "" };
+  const pod = !rollout
+    ? { state: flux.state === "waiting" ? "waiting" : "unknown", detail: "" }
+    : rollout.readyAt
+      ? { state: "done", detail: plus(rollout.startedAt, rollout.readyAt) }
+      : rollout.current
+        ? { state: "running", detail: "subindo" }
+        : { state: "replaced", detail: "substituído" };
+  return [
+    { name: "commit", state: committedAt ? "done" : "unknown", detail: committedAt ? committedAt.slice(11, 16) : "" },
+    { name: "imagem", ...image },
+    { name: "flux", ...flux },
+    { name: "pod", ...pod },
+  ];
+}
+
+/** The mark beside each stage in `deploys`. */
+export const STAGE_MARKS = {
+  done: "✓",
+  failed: "✗",
+  running: "…",
+  waiting: "…",
+  replaced: "·",
+  skipped: "–",
+  unknown: "?",
+};

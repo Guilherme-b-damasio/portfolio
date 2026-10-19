@@ -4,10 +4,12 @@ import { collectProbe } from "./probe.js";
 import {
   citationParts,
   commandForSource,
+  deployStages,
   formatAttrs,
   formatMs,
   formatUptime,
   formatUsd,
+  kubeAge,
   guessCommand,
   highlightParts,
   nodeRows,
@@ -18,13 +20,28 @@ import {
   scanHeadline,
   scoreBar,
   sections,
+  STAGE_MARKS,
   takeFlag,
   takeOption,
   VERDICTS,
   waterfallRows,
 } from "./lib.js";
 
-const COMMANDS = ["help", "whoami", "ls", "cat", "ask", "status", "kubectl", "trace", "scan", "curl", "open", "clear"];
+const COMMANDS = [
+  "help",
+  "whoami",
+  "ls",
+  "cat",
+  "ask",
+  "status",
+  "kubectl",
+  "deploys",
+  "trace",
+  "scan",
+  "curl",
+  "open",
+  "clear",
+];
 const KUBECTL_WORDS = [["get"], ["pods", "nodes"], ["-n", "-A"]]; // what Tab offers after `kubectl`, by position
 const OPENABLE = PAGES.filter((p) => p !== "inicio");
 const CHIPS = ["whoami", "ls projects", 'ask "como funciona o docsage?"', "status", "curl /api/projects", "help"];
@@ -109,6 +126,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ["status", "métricas ao vivo deste servidor"],
         ["kubectl get pods", "os pods do cluster agora (-n <ns> ou -A; só leitura)"],
         ["kubectl get nodes", "o nó, com CPU e memória do metrics-server"],
+        ["deploys", "commit → imagem → Flux → pod pronto, dos últimos pushes"],
         ["trace [id]", "cada etapa da última requisição (ou da do id)"],
         ["(clique num comando)", "abre o trace da requisição que ele fez"],
         ["scan", "o que este site sabe sobre você"],
@@ -414,6 +432,52 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ),
       );
       say(dim(`lido da API do cluster às ${body.readAt.slice(11, 19)} UTC · cache de 5 s no servidor`));
+    },
+
+    async deploys() {
+      const { res, body } = await api("/api/deploys");
+      if (res.status === 503 && body?.off) return say(warn("! "), body.error);
+      if (!res.ok) return failed(res.status);
+      say(dim("commit → imagem (GitHub Actions) → flux (rollout no cluster) → pod Ready"));
+      for (const [name, source] of [
+        ["GitHub", body.sources.github],
+        ["cluster", body.sources.cluster],
+      ]) {
+        if (source.state === "off") say(dim(`${name}: desligado neste servidor`));
+        if (source.state === "unavailable") say(warn("! "), `${name}: ${source.error}`);
+      }
+      if (!body.deploys.length) return say(dim("nenhum deploy para mostrar"));
+      const tone = { done: acc, failed: warn };
+      for (const d of body.deploys) {
+        const when = d.committedAt ?? d.build?.startedAt ?? d.rollout?.startedAt;
+        print(
+          line(
+            [
+              acc((d.sha || "???????").slice(0, 7)),
+              "  ",
+              d.message ?? dim("(commit fora da janela do GitHub)"),
+              when ? dim(`  há ${kubeAge(when)}`) : "",
+              ...(d.rollout?.current ? [bold("  ← no ar")] : []),
+            ],
+            "t-gap",
+          ),
+          line(
+            deployStages(d).flatMap((s, i) => [
+              i ? dim(" → ") : "  ",
+              (tone[s.state] ?? dim)(`${STAGE_MARKS[s.state]} ${s.name}`),
+              s.detail ? dim(` ${s.detail}`) : "",
+            ]),
+          ),
+        );
+        // Only links to the Actions run on GitHub; anything else in the field is ignored.
+        if (d.build?.url?.startsWith("https://github.com/"))
+          say(
+            dim("  "),
+            el("a", { href: d.build.url, target: "_blank", rel: "noopener", class: "t-link" }, "run no Actions ↗"),
+            d.rollout ? dim(`  ${d.rollout.image.split("/").pop()}`) : "",
+          );
+      }
+      say(dim(`GitHub em cache por 5 min, cluster por 10 s · lido às ${body.readAt.slice(11, 19)} UTC`));
     },
 
     async trace(args) {

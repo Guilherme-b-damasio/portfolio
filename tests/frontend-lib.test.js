@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 import {
   ago,
+  deployStages,
+  formatGap,
   candidateAddress,
   citationParts,
   commandForSource,
@@ -336,5 +338,66 @@ describe("kubectl helpers", () => {
     };
     expect(nodeRows([node], now)[1]).toBe("vps-1   Ready    46d   v1.33.4+k3s1   410m (21%)   1.0Gi (25%)");
     expect(nodeRows([{ ...node, ready: false, cpuUsageMilli: null }], now)[1]).toMatch(/NotReady .* – {3}/);
+  });
+});
+
+describe("formatGap", () => {
+  it("prints the wait between two stages in the largest units that fit", () => {
+    expect(formatGap("2026-10-17T17:00:00Z", "2026-10-17T17:00:45Z")).toBe("45s");
+    expect(formatGap("2026-10-17T17:00:00Z", "2026-10-17T17:03:07Z")).toBe("3m07s");
+    expect(formatGap("2026-10-17T17:00:00Z", "2026-10-17T19:05:00Z")).toBe("2h05m");
+    expect(formatGap(null, "2026-10-17T17:00:00Z")).toBeNull();
+  });
+});
+
+describe("deployStages", () => {
+  const build = {
+    status: "success",
+    startedAt: "2026-10-17T17:18:53Z",
+    finishedAt: "2026-10-17T17:19:39Z",
+    url: "https://github.com/o/r/actions/runs/1",
+  };
+  const rollout = {
+    revision: 5,
+    image: "x:20261017171853-9eae1df",
+    startedAt: "2026-10-17T17:21:04Z",
+    readyAt: "2026-10-17T17:21:19Z",
+    replicas: "1/1",
+    current: true,
+  };
+  const stages = (d) => deployStages(d).map((s) => `${s.name}:${s.state}:${s.detail}`);
+
+  it("follows a shipped change from commit to pod Ready, with the wait at each step", () => {
+    expect(stages({ committedAt: "2026-10-17T17:18:16Z", build, rollout })).toEqual([
+      "commit:done:17:18",
+      "imagem:done:46s",
+      "flux:done:rev 5 +1m25s",
+      "pod:done:+15s",
+    ]);
+  });
+
+  it("waits for Flux after a good build and stops after a failed one", () => {
+    expect(stages({ committedAt: "2026-10-17T17:18:16Z", build, rollout: null }).slice(2)).toEqual([
+      "flux:waiting:aguardando o Flux",
+      "pod:waiting:",
+    ]);
+    expect(stages({ committedAt: null, build: { ...build, status: "failure" }, rollout: null }).slice(1)).toEqual([
+      "imagem:failed:falhou",
+      "flux:skipped:",
+      "pod:unknown:",
+    ]);
+    expect(
+      stages({ committedAt: null, build: { ...build, status: "queued", finishedAt: null }, rollout: null })[1],
+    ).toBe("imagem:running:na fila");
+  });
+
+  it("marks revisions that were replaced and ones older than GitHub's window", () => {
+    const old = { ...rollout, readyAt: null, current: false };
+    expect(stages({ committedAt: null, build: null, rollout: old })).toEqual([
+      "commit:unknown:",
+      "imagem:unknown:fora da janela do GitHub",
+      "flux:done:rev 5",
+      "pod:replaced:substituído",
+    ]);
   });
 });
