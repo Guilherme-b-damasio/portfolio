@@ -129,20 +129,8 @@ export class KubernetesClusterReader implements ClusterReader {
     });
   }
 
-  private async read<T>(path: string, schema: z.ZodType<T>): Promise<T> {
-    let body: unknown;
-    try {
-      body = await this.get(path, AbortSignal.timeout(this.timeoutMs));
-    } catch (err) {
-      if (err instanceof KubeApiError && err.status === 403)
-        throw new ClusterUnavailable("o cluster recusou a leitura: falta permissão (RBAC)", { cause: err });
-      if (err instanceof Error && err.name === "TimeoutError")
-        throw new ClusterUnavailable(`a API do cluster não respondeu em ${this.timeoutMs} ms`, { cause: err });
-      throw new ClusterUnavailable("a API do cluster está fora de alcance", { cause: err });
-    }
-    const parsed = schema.safeParse(body);
-    if (!parsed.success) throw new ClusterUnavailable("a API do cluster respondeu num formato que não reconheço");
-    return parsed.data;
+  private read<T>(path: string, schema: z.ZodType<T>): Promise<T> {
+    return readKube(this.get, path, schema, this.timeoutMs);
   }
 
   // metrics-server is optional: without it (or when it is slow) the views just carry no usage.
@@ -153,4 +141,24 @@ export class KubernetesClusterReader implements ClusterReader {
       return null;
     }
   }
+}
+
+/**
+ * One timed GET, parsed against the fields a view needs. Every failure becomes a ClusterUnavailable
+ * whose message is safe to show: it says what went wrong without naming the API server.
+ */
+export async function readKube<T>(get: KubeGet, path: string, schema: z.ZodType<T>, timeoutMs: number): Promise<T> {
+  let body: unknown;
+  try {
+    body = await get(path, AbortSignal.timeout(timeoutMs));
+  } catch (err) {
+    if (err instanceof KubeApiError && err.status === 403)
+      throw new ClusterUnavailable("o cluster recusou a leitura: falta permissão (RBAC)", { cause: err });
+    if (err instanceof Error && err.name === "TimeoutError")
+      throw new ClusterUnavailable(`a API do cluster não respondeu em ${timeoutMs} ms`, { cause: err });
+    throw new ClusterUnavailable("a API do cluster está fora de alcance", { cause: err });
+  }
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) throw new ClusterUnavailable("a API do cluster respondeu num formato que não reconheço");
+  return parsed.data;
 }
