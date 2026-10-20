@@ -21,3 +21,32 @@ export interface Retriever {
 export class RetrieverUnavailable extends Error {
   override name = "RetrieverUnavailable";
 }
+
+/** BM25's knobs: term saturation (k1), length normalisation (b) and how many hits to keep (k). */
+export interface RankingParams {
+  k1: number;
+  b: number;
+  k: number;
+}
+
+/** What one query term added to a hit's score, so the playground can show why it ranked where it did. */
+export interface TermScore {
+  term: string;
+  tf: number; // occurrences in the chunk
+  df: number; // chunks that contain it
+  idf: number;
+  score: number;
+}
+
+export interface ExplainedHit extends Hit {
+  length: number; // the chunk in index terms, against the average
+  terms: TermScore[];
+}
+
+/** A retriever whose BM25 parameters can be turned per query, explaining each score. */
+export interface TunableRanker {
+  readonly defaults: RankingParams;
+  readonly averageLength: number;
+  readonly size: number; // chunks in the index
+  rank(query: string, params: RankingParams): ExplainedHit[];
+}
