@@ -49,4 +49,5 @@ export interface TunableRanker {
   readonly averageLength: number;
   readonly size: number; // chunks in the index
   rank(query: string, params: RankingParams): ExplainedHit[];
+  terms(query: string): string[];
 }
