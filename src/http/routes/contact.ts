@@ -51,25 +51,29 @@ export function contactRouter(sendContact: SendContact, logger: Logger) {
     next();
   });
 
-  router.post("/", rateLimit(bucket), async (_req, res, next) => {
-    const { website, ...message } = res.locals.contact as z.infer<typeof contactBody>;
-    if (website) {
-      // Pretend it worked so the bot moves on, but send nothing.
-      res.status(202).json({ id: "msg_ignored" });
-      return;
-    }
-    try {
-      const { id } = await sendContact.execute(message);
-      logger.info("contact sent", { requestId: res.locals.requestId, id, reason: message.reason });
-      res.status(202).json({ id });
-    } catch (err) {
-      if (err instanceof ContactBudgetError) {
-        res.status(503).json({ error: "Muitas mensagens hoje. Tente amanhã ou use o e-mail ao lado." });
+  router.post(
+    "/",
+    rateLimit(bucket, "Muitas mensagens seguidas. Tenta de novo daqui a pouco."),
+    async (_req, res, next) => {
+      const { website, ...message } = res.locals.contact as z.infer<typeof contactBody>;
+      if (website) {
+        // Pretend it worked so the bot moves on, but send nothing.
+        res.status(202).json({ id: "msg_ignored" });
         return;
       }
-      next(err);
-    }
-  });
+      try {
+        const { id } = await sendContact.execute(message);
+        logger.info("contact sent", { requestId: res.locals.requestId, id, reason: message.reason });
+        res.status(202).json({ id });
+      } catch (err) {
+        if (err instanceof ContactBudgetError) {
+          res.status(503).json({ error: "Muitas mensagens hoje. Tente amanhã ou use o e-mail ao lado." });
+          return;
+        }
+        next(err);
+      }
+    },
+  );
 
   return router;
 }

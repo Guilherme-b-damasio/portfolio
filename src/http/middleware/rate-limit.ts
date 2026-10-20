@@ -1,10 +1,11 @@
-import type { RequestHandler } from "express";
+import type { RequestHandler, Response } from "express";
 
 export interface BucketState {
   limit: number;
   remaining: number;
   refillPerMinute: number;
   retryAfterSeconds: number; // 0 when a token is available now
+  resetSeconds: number; // until the bucket is full again; 0 when it is full
 }
 
 /** In-memory token bucket per client key. Good enough for one replica; move to Redis if the deployment scales out. */
@@ -49,18 +50,28 @@ export class TokenBucket {
       remaining: Math.floor(tokens),
       refillPerMinute: this.refillPerMinute,
       retryAfterSeconds: tokens >= 1 ? 0 : Math.ceil(((1 - tokens) / this.refillPerMinute) * 60),
+      resetSeconds: Math.ceil(((this.capacity - tokens) / this.refillPerMinute) * 60),
     };
   }
 }
 
-export function rateLimit(bucket: TokenBucket): RequestHandler {
+/** The bucket on the response, so a client can draw it from the headers alone. */
+export function setRateLimitHeaders(res: Response, state: BucketState) {
+  res.setHeader("X-RateLimit-Limit", state.limit);
+  res.setHeader("X-RateLimit-Remaining", state.remaining);
+  res.setHeader("X-RateLimit-Reset", state.resetSeconds);
+}
+
+export function rateLimit(
+  bucket: TokenBucket,
+  message = "Muitas perguntas seguidas. Tenta de novo em instantes.",
+): RequestHandler {
   return (req, res, next) => {
     const { allowed, state } = bucket.take(req.ip ?? "unknown");
-    res.setHeader("X-RateLimit-Limit", state.limit);
-    res.setHeader("X-RateLimit-Remaining", state.remaining);
+    setRateLimitHeaders(res, state);
     if (!allowed) {
       res.setHeader("Retry-After", state.retryAfterSeconds);
-      res.status(429).json({ error: "Muitas perguntas seguidas. Tenta de novo em instantes." });
+      res.status(429).json({ error: message });
       return;
     }
     next();

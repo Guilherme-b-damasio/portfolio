@@ -97,7 +97,7 @@ export function scanRouter(
     res.json(tlsSamples?.list() ?? []);
   });
 
-  router.use(rateLimit(bucket), (_req, res, next) => {
+  router.use(rateLimit(bucket, "Muitos scans seguidos. Tenta de novo em instantes."), (_req, res, next) => {
     res.setHeader("Cache-Control", "no-store");
     next();
   });
