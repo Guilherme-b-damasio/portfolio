@@ -100,6 +100,8 @@ export function edgesFor({ route, status, generated }) {
   }
   if (route === "POST /api/contact") return status === 202 ? ["vi", "ia", "ar"] : ["vi", "ia"];
   if (route === "POST /mcp") return ["vi", "ia", "am"];
+  // The search playground ranks the chat's own index, without generating anything.
+  if (route === "GET /api/lab/search") return status === 200 ? ["vi", "ia", "ar", "rb"] : ["vi", "ia"];
   if (route.startsWith("GET /api/")) return ["vi", "ia", "am"];
   return ["vi", "ia"];
 }
@@ -493,4 +495,17 @@ export function bucketGlyphs(remaining, limit, max = 20) {
   const size = Math.max(0, Math.min(limit, max));
   const left = Math.max(0, Math.min(remaining, size));
   return "●".repeat(left) + "○".repeat(size - left);
+}
+
+/** Where a hit moved against the server's default ranking: "=", "↑2", "↓1", or "novo" when the defaults leave it out. */
+export function rankShift(rank, defaultRank) {
+  if (defaultRank == null) return "novo";
+  const moved = defaultRank - rank;
+  if (moved === 0) return "=";
+  return moved > 0 ? `↑${moved}` : `↓${-moved}`;
+}
+
+/** One query term's share of a BM25 score: "flux tf 2 · df 1 · idf 1.10 → 1.52". */
+export function explainTerm({ term, tf, df, idf, score }) {
+  return `${term} tf ${tf} · df ${df} · idf ${idf.toFixed(2)} → ${score.toFixed(2)}`;
 }

@@ -1,6 +1,7 @@
 import { api, apiStream, lastTraceId, recordTraces } from "./api.js";
 import { el } from "./dom.js";
 import { collectProbe } from "./probe.js";
+import { createSearchPlayground } from "./search-playground.js";
 import {
   bucketFromHeaders,
   bucketGlyphs,
@@ -39,6 +40,7 @@ const COMMANDS = [
   "kubectl",
   "deploys",
   "ratelimit",
+  "search",
   "trace",
   "scan",
   "curl",
@@ -64,6 +66,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
   let quota = null; // { remaining, limit, refillPerMinute, at }
   let busy = false;
   let conversation = []; // last turns with a generated answer, sent with the next ask as a follow-up
+  let playground = null; // the live `search` panel; opening another one freezes it
 
   // ---------- output ----------
   function line(segments, cls) {
@@ -132,6 +135,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ["kubectl get nodes", "o nó, com CPU e memória do metrics-server"],
         ["deploys", "commit → imagem → tag → Flux → pod pronto, dos últimos pushes"],
         ["ratelimit [n]", "esvazia um balde de tokens no servidor, lido dos headers"],
+        ['search "<consulta>"', "o ranking BM25 ao vivo, com sliders de k1, b e top-k"],
         ["trace [id]", "cada etapa da última requisição (ou da do id)"],
         ["(clique num comando)", "abre o trace da requisição que ele fez"],
         ["scan", "o que este site sabe sobre você"],
@@ -529,6 +533,32 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         dim(`${accepted} aceitos, ${shots - accepted} recusados com 429 · o balde está no servidor; `),
         dim("o navegador só lê os headers"),
       );
+    },
+
+    async search(args) {
+      const query = args.join(" ").trim();
+      if (query.length < 2 || query.length > 200)
+        return say(
+          warn("! "),
+          'uso: search "sua consulta" · de 2 a 200 caracteres, ex: ',
+          runButton('search "kubernetes flux"', 'search "kubernetes flux"'),
+        );
+      const { res, body } = await api("/api/lab/search/params");
+      if (res.status === 404) return say(warn("! "), "o playground de busca está desligado neste servidor");
+      if (!res.ok) return failed(res.status);
+      playground?.freeze();
+      playground = createSearchPlayground({
+        query,
+        ...body,
+        cite: (source) => cite(source, commandForSource(source)),
+      });
+      say(
+        dim("o mesmo índice BM25 que responde o "),
+        acc("ask"),
+        dim(": mexa nos sliders e o ranking volta do servidor"),
+      );
+      print(playground.root);
+      await playground.update();
     },
 
     async trace(args) {
