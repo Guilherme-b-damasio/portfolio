@@ -126,7 +126,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ["status", "métricas ao vivo deste servidor"],
         ["kubectl get pods", "os pods do cluster agora (-n <ns> ou -A; só leitura)"],
         ["kubectl get nodes", "o nó, com CPU e memória do metrics-server"],
-        ["deploys", "commit → imagem → Flux → pod pronto, dos últimos pushes"],
+        ["deploys", "commit → imagem → tag → Flux → pod pronto, dos últimos pushes"],
         ["trace [id]", "cada etapa da última requisição (ou da do id)"],
         ["(clique num comando)", "abre o trace da requisição que ele fez"],
         ["scan", "o que este site sabe sobre você"],
@@ -438,10 +438,11 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
       const { res, body } = await api("/api/deploys");
       if (res.status === 503 && body?.off) return say(warn("! "), body.error);
       if (!res.ok) return failed(res.status);
-      say(dim("commit → imagem (GitHub Actions) → flux (rollout no cluster) → pod Ready"));
+      say(dim("commit → imagem (GitHub Actions) → tag (ImagePolicy do Flux) → flux (rollout no cluster) → pod Ready"));
       for (const [name, source] of [
         ["GitHub", body.sources.github],
         ["cluster", body.sources.cluster],
+        ["Flux", body.sources.flux ?? { state: "off" }],
       ]) {
         if (source.state === "off") say(dim(`${name}: desligado neste servidor`));
         if (source.state === "unavailable") say(warn("! "), `${name}: ${source.error}`);
@@ -477,7 +478,8 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
             d.rollout ? dim(`  ${d.rollout.image.split("/").pop()}`) : "",
           );
       }
-      say(dim(`GitHub em cache por 5 min, cluster por 10 s · lido às ${body.readAt.slice(11, 19)} UTC`));
+      say(dim("tag: o cluster guarda os eventos do Flux por cerca de 1 h; antes disso aparece ?"));
+      say(dim(`GitHub em cache por 5 min, cluster e Flux por 10 s · lido às ${body.readAt.slice(11, 19)} UTC`));
     },
 
     async trace(args) {

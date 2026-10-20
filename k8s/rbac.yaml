@@ -1,6 +1,6 @@
 # Read-only access for the cluster panel and `kubectl get` in the terminal
 # (src/infrastructure/cluster/kubernetes-cluster-reader.ts), and the deploys timeline
-# (kubernetes-rollout-history.ts). GET and LIST only: no watch, no
+# (kubernetes-rollout-history.ts, flux-tag-selection-history.ts). GET and LIST only: no watch, no
 # secrets, no configmaps, no exec, no logs. Pods are readable only in the namespaces bound below,
 # which must match CLUSTER_NAMESPACES on the deployment; nodes are cluster-scoped, so they need a
 # ClusterRole. tests/k8s-rbac.test.ts keeps these rules in step with the paths the reader calls.
@@ -64,6 +64,32 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: portfolio-pod-reader
+subjects:
+  - kind: ServiceAccount
+    name: portfolio
+    namespace: portfolio
+---
+# The ImagePolicy's events in the Flux namespace, for when `deploys` saw the new tag picked
+# (flux-tag-selection-history.ts). Only events: nothing else in flux-system is readable.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: portfolio-flux-event-reader
+  namespace: flux-system
+rules:
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: portfolio-flux-event-reader
+  namespace: flux-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: portfolio-flux-event-reader
 subjects:
   - kind: ServiceAccount
     name: portfolio

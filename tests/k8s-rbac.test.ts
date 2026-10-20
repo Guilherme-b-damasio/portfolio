@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { FluxTagSelectionHistory } from "../src/infrastructure/cluster/flux-tag-selection-history.js";
 import { KubernetesClusterReader } from "../src/infrastructure/cluster/kubernetes-cluster-reader.js";
 import { KubernetesRolloutHistory } from "../src/infrastructure/cluster/kubernetes-rollout-history.js";
 
@@ -63,9 +64,13 @@ describe("k8s/rbac.yaml", () => {
     expect(all.length).toBeGreaterThan(0);
     for (const rule of all) {
       expect(rule.verbs.every((v) => v === "get" || v === "list")).toBe(true);
-      expect(rule.resources.every((r) => ["nodes", "pods", "replicasets"].includes(r))).toBe(true);
+      expect(rule.resources.every((r) => ["nodes", "pods", "replicasets", "events"].includes(r))).toBe(true);
       expect(rule.group).not.toBe("*");
     }
+    // Events only where the ImagePolicy lives, and nothing else there.
+    const flux = all.filter((r) => r.namespace === "flux-system");
+    expect(flux.map((r) => r.resources)).toEqual([["events"]]);
+    expect(all.filter((r) => r.resources.includes("events"))).toEqual(flux);
   });
 
   it("grants every path the cluster readers call, nodes cluster-wide and the rest per namespace", async () => {
@@ -82,7 +87,8 @@ describe("k8s/rbac.yaml", () => {
       deployment: "portfolio",
       selector: "app=portfolio",
     }).rollouts();
-    expect(calls).toHaveLength(6);
+    await new FluxTagSelectionHistory(get, { namespace: "flux-system", policy: "portfolio" }).selections();
+    expect(calls).toHaveLength(7);
     for (const call of calls) {
       const need = needOf(call);
       const granted = rules().some(
@@ -103,7 +109,7 @@ describe("k8s/rbac.yaml", () => {
     const roles = rules().filter((r) => r.kind === "Role");
     for (const ns of namespaces) expect(roles.some((r) => r.namespace === ns.trim())).toBe(true);
     const bindings = docs("rbac.yaml").filter((doc) => /^kind: (Cluster)?RoleBinding$/m.test(doc));
-    expect(bindings).toHaveLength(2);
+    expect(bindings).toHaveLength(3);
     for (const binding of bindings) expect(binding).toMatch(/kind: ServiceAccount\n\s*name: portfolio\n/);
   });
 });

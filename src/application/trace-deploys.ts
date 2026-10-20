@@ -5,6 +5,8 @@ import {
   DeliveryUnavailable,
   type RolloutHistory,
   type RolloutView,
+  type TagSelectionHistory,
+  type TagSelectionView,
 } from "../domain/delivery.js";
 
 /** One change on its way to production: the commit, the image built from it and the rollout that ran it. */
@@ -14,6 +16,7 @@ export interface DeployView {
   author: string | null;
   committedAt: string | null;
   build: Omit<BuildView, "sha" | "message" | "author" | "committedAt"> | null;
+  selectedAt: string | null; // when Flux's ImagePolicy picked the image's tag; null once the event expired
   rollout: Omit<RolloutView, "sha"> | null; // null until Flux applies the image, or for builds that never ship
 }
 
@@ -22,36 +25,49 @@ export type SourceState = { state: "ok" } | { state: "off" } | { state: "unavail
 
 export interface DeployTimeline {
   deploys: DeployView[];
-  sources: { github: SourceState; cluster: SourceState };
+  sources: { github: SourceState; cluster: SourceState; flux: SourceState };
 }
 
 const MAX_DEPLOYS = 10;
 
 /**
- * The `deploys` timeline: commit → image build (GitHub Actions) → rollout (the ReplicaSet Flux's
- * change created) → pod Ready. Builds and rollouts meet on the sha in the image tag. Each source can
- * fail on its own and the timeline still shows what the other one knows.
+ * The `deploys` timeline: commit → image build (GitHub Actions) → tag picked (Flux's ImagePolicy) →
+ * rollout (the ReplicaSet Flux's change created) → pod Ready. The sources meet on the sha in the image
+ * tag. Each one can fail on its own and the timeline still shows what the others know.
  */
 export class TraceDeploys {
   constructor(
     private readonly builds: BuildHistory | null,
     private readonly rollouts: RolloutHistory | null,
+    private readonly selections: TagSelectionHistory | null = null,
   ) {}
 
   async timeline(): Promise<DeployTimeline> {
-    const [github, cluster] = await Promise.all([
+    const [github, cluster, flux] = await Promise.all([
       settle(this.builds, (b) => b.builds()),
       settle(this.rollouts, (r) => r.rollouts()),
+      settle(this.selections, (s) => s.selections()),
     ]);
     const builds = github.value ?? [];
     const rollouts = cluster.value ?? [];
+    const selections = flux.value ?? [];
+    const selectedAt = (match: (s: TagSelectionView) => boolean) => selections.find(match)?.selectedAt ?? null;
 
     const matched = new Set<RolloutView>();
     const deploys: DeployView[] = builds.map(({ sha, message, author, committedAt, ...build }) => {
       // A sha can be rolled out more than once (a rollback); the newest revision is the one that counts.
       const rollout = rollouts.find((r) => r.sha !== null && sha.startsWith(r.sha));
       if (rollout) matched.add(rollout);
-      return { sha, message, author, committedAt, build, rollout: rollout ? withoutSha(rollout) : null };
+      const picked = selectedAt((s) => s.sha !== null && sha.startsWith(s.sha));
+      return {
+        sha,
+        message,
+        author,
+        committedAt,
+        build,
+        selectedAt: picked,
+        rollout: rollout ? withoutSha(rollout) : null,
+      };
     });
     // Revisions older than the builds GitHub lists, or with a tag that names no commit.
     for (const rollout of rollouts) {
@@ -62,10 +78,14 @@ export class TraceDeploys {
         author: null,
         committedAt: null,
         build: null,
+        selectedAt: selectedAt((s) => rollout.image.endsWith(`:${s.tag}`)),
         rollout: withoutSha(rollout),
       });
     }
-    return { deploys: deploys.slice(0, MAX_DEPLOYS), sources: { github: github.source, cluster: cluster.source } };
+    return {
+      deploys: deploys.slice(0, MAX_DEPLOYS),
+      sources: { github: github.source, cluster: cluster.source, flux: flux.source },
+    };
   }
 }
 

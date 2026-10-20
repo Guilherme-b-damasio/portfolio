@@ -43,6 +43,8 @@ Portuguese stemmer (`src/infrastructure/search/portuguese-stemmer.ts`), so "trab
 | `DOCSAGE_TIMEOUT_MS` | `2000`          | One docsage search, connection included; past it the question is answered from the local index |
 | `DEPLOYS_REPO`      | `Guilherme-b-damasio/portfolio` | Public repository whose `Image` workflow runs feed `deploys`; `off` skips GitHub |
 | `DEPLOYS_DEPLOYMENT` | `portfolio`     | Deployment (and `app=` label) whose ReplicaSets are the revisions in `deploys` |
+| `DEPLOYS_IMAGE_POLICY` | `$DEPLOYS_DEPLOYMENT` | Flux `ImagePolicy` whose events say when each tag was picked; `off` skips Flux |
+| `DEPLOYS_FLUX_NAMESPACE` | `flux-system` | Namespace of that `ImagePolicy` (needs the events Role in `k8s/rbac.yaml`) |
 | `GIT_SHA`, `BUILT_AT` | `dev`           | Shown in the footer and `/api/status` (set as Docker build args) |
 | `RESEND_API_KEY`, `CONTACT_TO` | unset | Turn on the contact form; messages go to `CONTACT_TO` through Resend |
 | `CONTACT_FROM`      | `onboarding@resend.dev` | Sender shown in the e-mail (needs a verified domain on Resend to change) |
@@ -70,6 +72,17 @@ Portuguese stemmer (`src/infrastructure/search/portuguese-stemmer.ts`), so "trab
 - A retrieval eval of 21 questions gates CI on recall@3, and `/evals` shows it live for the running
   index. A light Portuguese stemmer took it from 0.905 to 0.952 (MRR 0.786 → 0.873).
 
+## What's new in 0.3
+
+- Every API response carries an `x-trace-id`, and `trace <id>` (or a click on a past command)
+  draws its spans as a waterfall, from a ring buffer in memory.
+- The pod reads its own cluster through a read-only service account: `kubectl get pods|nodes` and
+  the Cluster panel show node usage against capacity and every pod in the allowed namespaces.
+  `tests/k8s-rbac.test.ts` keeps the RBAC at get/list and in step with the paths the code calls.
+- The Live panel keeps 24 h of metrics in a ring buffer and draws them as sparklines.
+- `deploys` follows each push from commit to image build (GitHub Actions) to the tag Flux picked to
+  the rollout and pod Ready, each source failing on its own.
+
 ## API
 
 | Route                     | Notes                                       |
@@ -94,7 +107,7 @@ Portuguese stemmer (`src/infrastructure/search/portuguese-stemmer.ts`), so "trab
 | `GET /api/status`         | Uptime, memory, pod/node, p50/p95 per route, tokens spent today (`llmBudget`), and `cluster: { namespaces }` when the pod can read its cluster |
 | `GET /api/cluster`        | Nodes (with CPU and memory against capacity) and the pods of every visible namespace, read from the Kubernetes API; 503 with `off: true` outside a cluster, 503 + `Retry-After` when the API server is out of reach |
 | `GET /api/cluster/nodes`, `GET /api/cluster/pods?namespace=` | The same, one kind at a time; a namespace outside the whitelist answers 403 with the visible ones |
-| `GET /api/deploys`       | The last pushes to `develop`, each from commit to image build (GitHub Actions) to rollout (the ReplicaSet Flux's change created) to pod Ready. Always 200: `sources.github` and `sources.cluster` say on their own whether they answered (`ok`, `off` or `unavailable` with a safe `error`) |
+| `GET /api/deploys`       | The last pushes to `develop`, each from commit to image build (GitHub Actions) to the tag Flux picked (`selectedAt`) to rollout (the ReplicaSet Flux's change created) to pod Ready. Always 200: `sources.github`, `sources.cluster` and `sources.flux` say on their own whether they answered (`ok`, `off` or `unavailable` with a safe `error`) |
 | `GET /api/status/history` | In-process samples every 5 min for the last 24h (reset on restart) |
 | `GET /api/traces/:id`     | One finished `/api` or `/mcp` request, step by step: route, status, total time and its spans (`retrieve`, `generate`) with offsets, durations and attributes. The id comes in each response's `x-trace-id`; the last 500 are kept in memory, 32 spans each. `trace [id]` in the terminal draws the waterfall |
 | `GET /metrics`            | Prometheus text format, including `portfolio_llm_tokens_used_today` |
@@ -188,8 +201,8 @@ the pod's own `POD_NAMESPACE`; outside a cluster both say so instead of failing.
 ## Deploys timeline
 
 `deploys` in the terminal follows each push to `develop` on its way to production: commit → image
-→ Flux → pod Ready, with the wait at each stage. Two read-only sources meet on the sha in the image
-tag (`<YYYYMMDDHHmmss>-<sha>`):
+→ tag picked → Flux rollout → pod Ready, with the wait at each stage. Three read-only sources meet
+on the sha in the image tag (`<YYYYMMDDHHmmss>-<sha>`):
 
 - `GitHubBuildHistory` reads the runs of the `Image` workflow on `develop` from the public GitHub
   API, without a token: one call per read, 3 s timeout, 500 KB cap. `CachedBuildHistory` keeps the
@@ -197,11 +210,16 @@ tag (`<YYYYMMDDHHmmss>-<sha>`):
 - `KubernetesRolloutHistory` lists the deployment's ReplicaSets (one per revision, as many as
   `revisionHistoryLimit` keeps) and its pods' Ready transitions, with the same service account as
   the cluster reader. `CachedRolloutHistory` keeps it for 10 s.
+- `FluxTagSelectionHistory` reads the `ImagePolicy`'s events in `flux-system` (one GET, filtered on
+  the server to that policy) and parses the tag out of image-reflector-controller's "Latest image tag
+  … resolved to / updated from … to …" message. The API server drops events after `--event-ttl` (an
+  hour by default), so older deploys show `?` at that stage and their rollout is timed from the
+  build instead. `CachedTagSelectionHistory` keeps it for 10 s.
 
-`TraceDeploys` joins them, and either source can fail on its own: outside a cluster the timeline
+`TraceDeploys` joins them, and each source can fail on its own: outside a cluster the timeline
 still shows the builds, and with GitHub rate-limited it still shows the revisions. `DEPLOYS_REPO`
 (`owner/name`, default this repository; `off` to skip GitHub) and `DEPLOYS_DEPLOYMENT` (default
-`portfolio`, also used as the `app=` label) point it elsewhere.
+`portfolio`, also used as the `app=` label) point it elsewhere; `DEPLOYS_IMAGE_POLICY=off` skips Flux.
 
 ## Deploy (k3s)
 
@@ -216,6 +234,7 @@ optional `portfolio-secrets` secret the app runs retrieval-only.
 
 `k8s/rbac.yaml` gives the pod its read-only view of the cluster: a `portfolio` service account, a
 ClusterRole to get and list nodes (and their metrics-server usage), and a Role per visible namespace
-to get and list pods (plus the deployment's ReplicaSets in its own namespace, for `deploys`). No watch, no secrets, no logs, no exec. Each namespace in `CLUSTER_NAMESPACES`
+to get and list pods (plus the deployment's ReplicaSets in its own namespace, for `deploys`), and a
+Role in `flux-system` to get and list events only, for the tag stage of `deploys`. No watch, no secrets, no logs, no exec. Each namespace in `CLUSTER_NAMESPACES`
 needs its own Role and RoleBinding; `tests/k8s-rbac.test.ts` fails if a rule ever grants more than
 get/list or stops covering a path the reader calls.

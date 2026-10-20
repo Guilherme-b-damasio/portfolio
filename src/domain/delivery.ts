@@ -38,3 +38,15 @@ export interface RolloutView {
 export interface RolloutHistory {
   rollouts(): Promise<RolloutView[]>;
 }
+
+/** The moment Flux's image automation picked a new tag, before it rewrote the deployment. */
+export interface TagSelectionView {
+  tag: string;
+  sha: string | null; // the short sha in a `<timestamp>-<sha>` tag; null for any other tag
+  selectedAt: string;
+}
+
+/** The tags the ImagePolicy picked recently, newest first. Read-only; the cluster keeps these for about an hour. */
+export interface TagSelectionHistory {
+  selections(): Promise<TagSelectionView[]>;
+}
