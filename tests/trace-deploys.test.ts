@@ -3,6 +3,7 @@ import { TraceDeploys } from "../src/application/trace-deploys.js";
 import type { BuildView, RolloutView } from "../src/domain/delivery.js";
 import { FakeBuildHistory, fakeBuild } from "./fakes/fake-build-history.js";
 import { FakeRolloutHistory, fakeRollout } from "./fakes/fake-rollout-history.js";
+import { FakeTagSelectionHistory, fakeSelection } from "./fakes/fake-tag-selection-history.js";
 
 const running: BuildView = {
   ...fakeBuild,
@@ -28,7 +29,7 @@ describe("TraceDeploys", () => {
       new FakeRolloutHistory([fakeRollout, older]),
     );
     const { deploys, sources } = await trace.timeline();
-    expect(sources).toEqual({ github: { state: "ok" }, cluster: { state: "ok" } });
+    expect(sources).toEqual({ github: { state: "ok" }, cluster: { state: "ok" }, flux: { state: "off" } });
     expect(deploys.map((d) => d.sha)).toEqual(["c".repeat(40), fakeBuild.sha, "a3b3c7a"]);
 
     // Still building: no rollout yet.
@@ -45,6 +46,7 @@ describe("TraceDeploys", () => {
         finishedAt: fakeBuild.finishedAt,
         url: fakeBuild.url,
       },
+      selectedAt: null,
       rollout: {
         revision: 5,
         image: fakeRollout.image,
@@ -83,7 +85,39 @@ describe("TraceDeploys", () => {
     expect(sources).toEqual({
       github: { state: "unavailable", error: "falhou ao ler esta fonte" },
       cluster: { state: "off" },
+      flux: { state: "off" },
     });
+  });
+
+  it("marks when Flux picked each tag, for builds and for revisions older than the builds", async () => {
+    const trace = new TraceDeploys(
+      new FakeBuildHistory([running, fakeBuild]),
+      new FakeRolloutHistory([fakeRollout, older]),
+      new FakeTagSelectionHistory([
+        fakeSelection,
+        { tag: "20261017141907-a3b3c7a", sha: "a3b3c7a", selectedAt: "2026-10-17T14:20:30Z" },
+      ]),
+    );
+    const { deploys, sources } = await trace.timeline();
+    expect(sources.flux).toEqual({ state: "ok" });
+    expect(deploys.map((d) => d.selectedAt)).toEqual([null, fakeSelection.selectedAt, "2026-10-17T14:20:30Z"]);
+  });
+
+  it("keeps the timeline when the Flux events cannot be read", async () => {
+    const selections = new FakeTagSelectionHistory();
+    selections.down = true;
+    const { deploys, sources } = await new TraceDeploys(
+      new FakeBuildHistory(),
+      new FakeRolloutHistory(),
+      selections,
+    ).timeline();
+    expect(sources.flux).toEqual({
+      state: "unavailable",
+      error: "o cluster recusou a leitura: falta permissão (RBAC)",
+    });
+    expect(deploys).toEqual([
+      expect.objectContaining({ selectedAt: null, rollout: expect.objectContaining({ revision: 5 }) }),
+    ]);
   });
 
   it("caps the timeline at ten deploys", async () => {

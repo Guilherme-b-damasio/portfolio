@@ -20,6 +20,8 @@ import { createApp } from "./http/app.js";
 import { MAX_TURNS } from "./http/routes/api.js";
 import { CachedClusterReader } from "./infrastructure/cluster/cached-cluster-reader.js";
 import { CachedRolloutHistory } from "./infrastructure/cluster/cached-rollout-history.js";
+import { CachedTagSelectionHistory } from "./infrastructure/cluster/cached-tag-selection-history.js";
+import { FluxTagSelectionHistory } from "./infrastructure/cluster/flux-tag-selection-history.js";
 import { inClusterGet } from "./infrastructure/cluster/in-cluster-get.js";
 import { KubernetesClusterReader } from "./infrastructure/cluster/kubernetes-cluster-reader.js";
 import { KubernetesRolloutHistory } from "./infrastructure/cluster/kubernetes-rollout-history.js";
@@ -106,6 +108,18 @@ const rolloutHistory = kubeGet
       }),
     )
   : null;
+// When Flux picked each tag, from its ImagePolicy's events (Role in flux-system, k8s/rbac.yaml).
+// DEPLOYS_IMAGE_POLICY=off skips it, e.g. on a cluster without Flux image automation.
+const imagePolicy = process.env.DEPLOYS_IMAGE_POLICY ?? deployment;
+const tagSelections =
+  kubeGet && imagePolicy !== "off"
+    ? new CachedTagSelectionHistory(
+        new FluxTagSelectionHistory(kubeGet, {
+          namespace: process.env.DEPLOYS_FLUX_NAMESPACE ?? "flux-system",
+          policy: imagePolicy,
+        }),
+      )
+    : null;
 const tap = certFile && keyFile ? new TlsTap({ proxyProtocol: process.env.TLS_PROXY_PROTOCOL === "1" }) : null;
 
 const app = createApp({
@@ -132,7 +146,7 @@ const app = createApp({
   traces,
   showTrace: new ShowTrace(traces),
   inspectCluster: new InspectCluster(clusterReader),
-  traceDeploys: new TraceDeploys(buildHistory, rolloutHistory),
+  traceDeploys: new TraceDeploys(buildHistory, rolloutHistory, tagSelections),
   publicDir: path.join(root, "public"),
   // Questions per visitor: a bucket this size that refills at the same rate per minute.
   askLimit: { capacity: askRate, refillPerMinute: askRate },
