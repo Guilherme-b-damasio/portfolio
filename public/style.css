@@ -2273,3 +2273,46 @@ textarea.input {
     transition: none;
   }
 }
+.t-play {
+  margin-block: 6px 10px;
+}
+.t-sliders {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+  margin-bottom: 6px;
+}
+.t-slider {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.t-slider input {
+  width: 120px;
+  accent-color: var(--term-accent);
+}
+.t-slider output {
+  min-width: 4ch;
+}
+.t-rank {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.t-moved {
+  animation: t-moved 0.9s ease-out;
+}
+@keyframes t-moved {
+  from {
+    border-left-color: var(--term-accent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-moved {
+    animation: none;
+  }
+}
+.t-frozen {
+  opacity: 0.6;
+}

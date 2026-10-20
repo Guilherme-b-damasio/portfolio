@@ -10,6 +10,7 @@ import {
   citationParts,
   commandForSource,
   edgesFor,
+  explainTerm,
   fieldOfByte,
   formatUptime,
   formatUsd,
@@ -26,6 +27,7 @@ import {
   podRows,
   parseLine,
   parseSse,
+  rankShift,
   rememberTurn,
   routeLabel,
   scanHeadline,
@@ -95,6 +97,15 @@ describe("front-end helpers", () => {
     expect(edgesFor({ route: "POST /api/ask", status: 503 })).toEqual(["vi", "ia", "ar"]);
     expect(edgesFor({ route: "GET /api/status", status: 200 })).toEqual(["vi", "ia", "ax"]);
     expect(edgesFor({ route: "GET /api/projects/:slug", status: 404 })).toEqual(["vi", "ia"]);
+    expect(edgesFor({ route: "GET /api/lab/search", status: 200 })).toEqual(["vi", "ia", "ar", "rb"]);
+    expect(edgesFor({ route: "GET /api/lab/search", status: 429 })).toEqual(["vi", "ia"]);
+  });
+
+  it("says where a playground hit moved against the default ranking, and why it scored", () => {
+    expect([rankShift(1, 1), rankShift(1, 3), rankShift(4, 2), rankShift(2, null)]).toEqual(["=", "↑2", "↓2", "novo"]);
+    expect(explainTerm({ term: "flux", tf: 2, df: 1, idf: 1.1, score: 1.5234 })).toBe(
+      "flux tf 2 · df 1 · idf 1.10 → 1.52",
+    );
   });
 
   it("draws a sparkline only with two or more points", () => {

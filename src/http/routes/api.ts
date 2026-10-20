@@ -11,6 +11,7 @@ import type { SendContact } from "../../application/send-contact.js";
 import type { ShowEvals } from "../../application/show-evals.js";
 import type { ShowTrace } from "../../application/show-trace.js";
 import type { TraceDeploys } from "../../application/trace-deploys.js";
+import type { TuneSearch } from "../../application/tune-search.js";
 import type { Logger } from "../../domain/logger.js";
 import type { TappedConnections } from "../../domain/tls.js";
 import { concurrencyCap, ConcurrencyGate } from "../middleware/concurrency.js";
@@ -21,6 +22,7 @@ import { contactRouter } from "./contact.js";
 import { evalsRouter } from "./evals.js";
 import { labRouter } from "./lab.js";
 import { scanRouter } from "./scan.js";
+import { searchLabRouter } from "./search-lab.js";
 
 export interface ApiDeps {
   browse: BrowsePortfolio;
@@ -37,6 +39,7 @@ export interface ApiDeps {
   showTrace?: ShowTrace | null; // finished traces at /api/traces/:id; off without a trace store
   inspectCluster?: InspectCluster | null; // /api/cluster; without one it answers that the cluster is off
   traceDeploys?: TraceDeploys | null; // /api/deploys; both of its sources are cached upstream
+  tuneSearch?: TuneSearch | null; // the search playground at /api/lab/search; off without a tunable index
 }
 
 // A follow-up carries the last turns from the browser. Capped here so a visitor cannot inflate the prompt.
@@ -83,6 +86,7 @@ export function apiRouter(
     showTrace,
     inspectCluster,
     traceDeploys,
+    tuneSearch,
   }: ApiDeps,
   logger: Logger,
   { bucket: askBucket, gate: askGate }: AskGuards,
@@ -224,6 +228,7 @@ export function apiRouter(
     }
   });
   api.use("/contact", contactRouter(sendContact, logger));
+  if (tuneSearch) api.use("/lab/search", searchLabRouter(tuneSearch));
   api.use("/lab", labRouter());
   if (showEvals) api.use("/evals", evalsRouter(showEvals));
   api.use("/scan", scanRouter(inspectVisitor, tapped ?? null, tlsSamples ?? null));

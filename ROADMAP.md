@@ -74,7 +74,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 - [x] Laboratório de rate limit: balde de tokens do visitante a partir dos headers reais, com botão "dispara 10"
 - [x] Servidor MCP público em `/mcp` (Streamable HTTP, só leitura: `profile`, `projects`, `search`) + instrução
       `claude mcp add` na página
-- [ ] Playground de busca: sliders de `k1`, `b` e top-k, com o ranking se reordenando ao vivo
+- [x] Playground de busca: sliders de `k1`, `b` e top-k, com o ranking se reordenando ao vivo
 - [ ] Laboratório de carga controlada: ≤ 200 requisições, uma corrida por vez no total, fila visível e latência via SSE
 - [x] Raio-X do visitante: `/voce` e `scan` cruzam rede, HTTP e navegador e apontam contradições
       (UA trocado, fuso falsificado pela metade, GPU impossível para o sistema, automação, WebRTC, navegador

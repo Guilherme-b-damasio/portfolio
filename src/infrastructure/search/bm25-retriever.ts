@@ -1,4 +1,4 @@
-import type { Chunk, Hit, Retriever } from "../../domain/search.js";
+import type { Chunk, ExplainedHit, Hit, RankingParams, Retriever, TunableRanker } from "../../domain/search.js";
 import { stemPortuguese } from "./portuguese-stemmer.js";
 
 const STOPWORDS = new Set(
@@ -19,7 +19,7 @@ export function tokenize(text: string): string[] {
     .filter((t) => t.length > 1 && !STOPWORDS.has(t));
 }
 
-export class Bm25Retriever implements Retriever {
+export class Bm25Retriever implements Retriever, TunableRanker {
   private readonly docs: { chunk: Chunk; terms: Map<string, number>; length: number }[];
   private readonly df = new Map<string, number>();
   private readonly avgLength: number;
@@ -46,26 +46,50 @@ export class Bm25Retriever implements Retriever {
     return [...new Set(tokenize(query).map(this.stem))];
   }
 
+  get defaults(): RankingParams {
+    return { k1: this.k1, b: this.b, k: 4 };
+  }
+
+  get averageLength(): number {
+    return Number(this.avgLength.toFixed(1));
+  }
+
+  get size(): number {
+    return this.docs.length;
+  }
+
   search(query: string, k = 4): Hit[] {
+    return this.rank(query, { k1: this.k1, b: this.b, k }).map(({ chunk, score, matchedTerms }) => ({
+      chunk,
+      score,
+      matchedTerms,
+    }));
+  }
+
+  /** The same ranking with any k1 and b, and what each query term added to each score. */
+  rank(query: string, { k1, b, k }: RankingParams): ExplainedHit[] {
     const queryTerms = this.terms(query);
     const n = this.docs.length;
 
     return this.docs
       .map(({ chunk, terms, length }) => {
         let score = 0;
-        const matchedTerms: string[] = [];
+        const explained = [];
         for (const term of queryTerms) {
           const tf = terms.get(term);
           if (!tf) continue;
-          matchedTerms.push(term);
           const df = this.df.get(term) ?? 0;
           const idf = Math.log(1 + (n - df + 0.5) / (df + 0.5));
-          score += idf * ((tf * (this.k1 + 1)) / (tf + this.k1 * (1 - this.b + this.b * (length / this.avgLength))));
+          const termScore = idf * ((tf * (k1 + 1)) / (tf + k1 * (1 - b + b * (length / this.avgLength))));
+          score += termScore;
+          explained.push({ term, tf, df, idf: round(idf), score: round(termScore) });
         }
-        return { chunk, score: Number(score.toFixed(3)), matchedTerms };
+        return { chunk, score: round(score), matchedTerms: explained.map((t) => t.term), length, terms: explained };
       })
       .filter((hit) => hit.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, k);
   }
 }
+
+const round = (n: number) => Number(n.toFixed(3));

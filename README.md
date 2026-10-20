@@ -103,6 +103,8 @@ Portuguese stemmer (`src/infrastructure/search/portuguese-stemmer.ts`), so "trab
 | `POST /api/contact`       | `{ reason, name, email, message }`, 3 per visitor per hour, 30 a day in total |
 | `GET /api/lab/ratelimit`  | The rate limit lab: spends one token from a bucket of 10 per visitor that refills one every 3 s, apart from the question bucket. 429 + `Retry-After` once it is empty. `ratelimit [n]` in the terminal fires up to 10 and draws the bucket from the headers |
 | `GET /api/lab/ratelimit/bucket` | The lab bucket's balance, without spending |
+| `GET /api/lab/search?q=&k1=&b=&k=` | The search playground: the chat's own BM25 index ranked with the visitor's `k1` (0–3), `b` (0–1) and top-k (1–10), each hit with its rank under the server's defaults (`defaultRank`) and what every query term added to its score (`tf`, `df`, `idf`). 60 per visitor, refilling 2 a second. `search "<query>"` in the terminal draws sliders that rerank live |
+| `GET /api/lab/search/params` | The sliders' ranges and the server's own `k1`, `b` and `k` |
 | `GET /api/scan`           | What the bare request gives away (try it with curl); never cached |
 | `POST /api/scan`          | Same, plus the browser probe from `/voce`: findings where the layers contradict each other. 10 per visitor per minute |
 | `GET /api/scan/tls-samples` | Real ClientHellos captured from known clients (`data/tls-samples/`), with JA4 and every byte annotated |
@@ -123,7 +125,7 @@ curl -N -H 'content-type: application/json' -H 'accept: text/event-stream'   -d 
 
 ## Rate limits
 
-Every limited route (`/api/ask`, `/mcp`, `/api/scan`, `/api/contact` and the lab) is an in-memory
+Every limited route (`/api/ask`, `/mcp`, `/api/scan`, `/api/contact` and the labs) is an in-memory
 token bucket per visitor (`src/http/middleware/rate-limit.ts`) and says where the visitor stands on
 every response: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` (seconds until the
 bucket is full again) and, on a 429, `Retry-After`. A full bucket is dropped from memory, so idle
