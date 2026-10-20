@@ -368,21 +368,37 @@ describe("deployStages", () => {
   const stages = (d) => deployStages(d).map((s) => `${s.name}:${s.state}:${s.detail}`);
 
   it("follows a shipped change from commit to pod Ready, with the wait at each step", () => {
-    expect(stages({ committedAt: "2026-10-17T17:18:16Z", build, rollout })).toEqual([
+    const selectedAt = "2026-10-17T17:20:41Z";
+    expect(stages({ committedAt: "2026-10-17T17:18:16Z", build, selectedAt, rollout })).toEqual([
       "commit:done:17:18",
       "imagem:done:46s",
-      "flux:done:rev 5 +1m25s",
+      "tag:done:+1m02s",
+      "flux:done:rev 5 +23s",
       "pod:done:+15s",
+    ]);
+  });
+
+  it("times the rollout from the build when the tag's event has expired", () => {
+    expect(stages({ committedAt: "2026-10-17T17:18:16Z", build, selectedAt: null, rollout }).slice(2, 4)).toEqual([
+      "tag:unknown:",
+      "flux:done:rev 5 +1m25s",
     ]);
   });
 
   it("waits for Flux after a good build and stops after a failed one", () => {
     expect(stages({ committedAt: "2026-10-17T17:18:16Z", build, rollout: null }).slice(2)).toEqual([
-      "flux:waiting:aguardando o Flux",
+      "tag:waiting:aguardando o Flux",
+      "flux:waiting:",
+      "pod:waiting:",
+    ]);
+    expect(stages({ committedAt: null, build, selectedAt: "2026-10-17T17:20:41Z", rollout: null }).slice(2)).toEqual([
+      "tag:done:+1m02s",
+      "flux:waiting:aplicando a tag",
       "pod:waiting:",
     ]);
     expect(stages({ committedAt: null, build: { ...build, status: "failure" }, rollout: null }).slice(1)).toEqual([
       "imagem:failed:falhou",
+      "tag:skipped:",
       "flux:skipped:",
       "pod:unknown:",
     ]);
@@ -396,6 +412,7 @@ describe("deployStages", () => {
     expect(stages({ committedAt: null, build: null, rollout: old })).toEqual([
       "commit:unknown:",
       "imagem:unknown:fora da janela do GitHub",
+      "tag:unknown:",
       "flux:done:rev 5",
       "pod:replaced:substituído",
     ]);

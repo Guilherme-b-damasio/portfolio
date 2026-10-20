@@ -418,10 +418,11 @@ export function formatGap(fromIso, toIso) {
 }
 
 /**
- * The four stages of one deploy as `deploys` prints them: commit → image → flux → pod. Each has a
- * state (done, failed, running, waiting, replaced, unknown) and how long it took after the one before.
+ * The five stages of one deploy as `deploys` prints them: commit → image → tag → flux → pod. Each has
+ * a state (done, failed, running, waiting, replaced, skipped, unknown) and how long it took after the
+ * one before. `tag` is when Flux's ImagePolicy picked the image; the cluster forgets that within an hour.
  */
-export function deployStages({ committedAt, build, rollout }) {
+export function deployStages({ committedAt, build, selectedAt, rollout }) {
   const plus = (from, to) => {
     const gap = formatGap(from, to);
     return gap ? `+${gap}` : "";
@@ -433,11 +434,21 @@ export function deployStages({ committedAt, build, rollout }) {
       : build.status === "running" || build.status === "queued"
         ? { state: "running", detail: build.status === "queued" ? "na fila" : "construindo" }
         : { state: "failed", detail: build.status === "cancelled" ? "cancelado" : "falhou" };
+  const tag = selectedAt
+    ? { state: "done", detail: plus(build?.finishedAt, selectedAt) }
+    : rollout
+      ? { state: "unknown", detail: "" } // picked before the oldest event the cluster still keeps
+      : image.state === "done"
+        ? { state: "waiting", detail: "aguardando o Flux" }
+        : { state: image.state === "failed" ? "skipped" : "unknown", detail: "" };
   const flux = rollout
-    ? { state: "done", detail: `rev ${rollout.revision} ${plus(build?.finishedAt, rollout.startedAt)}`.trim() }
-    : image.state === "done"
-      ? { state: "waiting", detail: "aguardando o Flux" }
-      : { state: image.state === "failed" ? "skipped" : "unknown", detail: "" };
+    ? {
+        state: "done",
+        detail: `rev ${rollout.revision} ${plus(selectedAt ?? build?.finishedAt, rollout.startedAt)}`.trim(),
+      }
+    : tag.state === "done"
+      ? { state: "waiting", detail: "aplicando a tag" }
+      : { state: tag.state, detail: "" };
   const pod = !rollout
     ? { state: flux.state === "waiting" ? "waiting" : "unknown", detail: "" }
     : rollout.readyAt
@@ -448,6 +459,7 @@ export function deployStages({ committedAt, build, rollout }) {
   return [
     { name: "commit", state: committedAt ? "done" : "unknown", detail: committedAt ? committedAt.slice(11, 16) : "" },
     { name: "imagem", ...image },
+    { name: "tag", ...tag },
     { name: "flux", ...flux },
     { name: "pod", ...pod },
   ];
