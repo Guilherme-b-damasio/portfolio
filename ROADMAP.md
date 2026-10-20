@@ -61,13 +61,13 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 - [x] `kubectl get pods` e painel "Cluster": node, pods, CPU/memória (metrics-server), restarts, idade
 - [x] Manifests de RBAC só leitura em `k8s/rbac.yaml` (Role/ClusterRole mínimos), ao lado dos outros manifests
 - [x] Ring buffer de 24h das métricas no processo, com sparklines no painel "Ao vivo"
-- [ ] `deploys`: linha do tempo commit → imagem → Flux → pod pronto (API do GitHub + eventos do cluster)
+- [x] `deploys`: linha do tempo commit → imagem → Flux → pod pronto (API do GitHub + eventos do cluster)
   - [x] Porta `BuildHistory` + adapter das execuções do workflow `Image` na `develop` (API pública, sem token),
         com cache de 5 min para ficar longe do limite anônimo do GitHub
   - [x] Porta `RolloutHistory`: ReplicaSets do deployment (imagem, revisão, criação) e quando o pod ficou Ready,
         com o RBAC só leitura correspondente
   - [x] Caso de uso que junta build e rollout pelo sha, `/api/deploys` e comando `deploys` no terminal
-  - [ ] Eventos do Flux (`ImagePolicy`/`ImageUpdateAutomation`) para marcar quando a tag nova foi escolhida
+  - [x] Eventos do Flux (`ImagePolicy`) para marcar quando a tag nova foi escolhida
 
 ## 0.4 Playgrounds
 
