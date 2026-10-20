@@ -16,6 +16,7 @@ import { SendContact } from "./application/send-contact.js";
 import { ShowEvals } from "./application/show-evals.js";
 import { ShowTrace } from "./application/show-trace.js";
 import { TraceDeploys } from "./application/trace-deploys.js";
+import { TuneSearch } from "./application/tune-search.js";
 import { createApp } from "./http/app.js";
 import { MAX_TURNS } from "./http/routes/api.js";
 import { CachedClusterReader } from "./infrastructure/cluster/cached-cluster-reader.js";
@@ -147,6 +148,8 @@ const app = createApp({
   showTrace: new ShowTrace(traces),
   inspectCluster: new InspectCluster(clusterReader),
   traceDeploys: new TraceDeploys(buildHistory, rolloutHistory, tagSelections),
+  // The search playground ranks the same index the chat answers from.
+  tuneSearch: new TuneSearch(retriever),
   publicDir: path.join(root, "public"),
   // Questions per visitor: a bucket this size that refills at the same rate per minute.
   askLimit: { capacity: askRate, refillPerMinute: askRate },
