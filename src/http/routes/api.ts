@@ -19,6 +19,7 @@ import { openEventStream } from "../sse.js";
 import { clusterRouter } from "./cluster.js";
 import { contactRouter } from "./contact.js";
 import { evalsRouter } from "./evals.js";
+import { labRouter } from "./lab.js";
 import { scanRouter } from "./scan.js";
 
 export interface ApiDeps {
@@ -223,6 +224,7 @@ export function apiRouter(
     }
   });
   api.use("/contact", contactRouter(sendContact, logger));
+  api.use("/lab", labRouter());
   if (showEvals) api.use("/evals", evalsRouter(showEvals));
   api.use("/scan", scanRouter(inspectVisitor, tapped ?? null, tlsSamples ?? null));
 
