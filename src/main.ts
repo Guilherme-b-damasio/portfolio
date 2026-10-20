@@ -10,6 +10,7 @@ import { BrowsePortfolio } from "./application/browse-portfolio.js";
 import { BrowseTlsSamples } from "./application/browse-tls-samples.js";
 import { InspectCluster } from "./application/inspect-cluster.js";
 import { InspectVisitor } from "./application/inspect-visitor.js";
+import { LoadLab } from "./application/load-lab.js";
 import { scanChecks } from "./application/scan/checks/index.js";
 import { ReportStatus } from "./application/report-status.js";
 import { SendContact } from "./application/send-contact.js";
@@ -30,6 +31,7 @@ import { CachedBuildHistory } from "./infrastructure/delivery/cached-build-histo
 import { GitHubBuildHistory, gitHubGet } from "./infrastructure/delivery/github-build-history.js";
 import { MarkdownContentSource } from "./infrastructure/content/markdown-content-source.js";
 import { loadEvalSet } from "./infrastructure/evals/json-eval-set.js";
+import { LoopbackTarget } from "./infrastructure/load/loopback-target.js";
 import { JsonLogger } from "./infrastructure/logging/json-logger.js";
 import { AnthropicPriceList } from "./infrastructure/llm/anthropic-price-list.js";
 import { ClaudeAnswerer } from "./infrastructure/llm/claude-answerer.js";
@@ -150,6 +152,14 @@ const app = createApp({
   traceDeploys: new TraceDeploys(buildHistory, rolloutHistory, tagSelections),
   // The search playground ranks the same index the chat answers from.
   tuneSearch: new TuneSearch(retriever),
+  // The load lab fires at fixed, unlimited routes of this same process over loopback.
+  loadLab: new LoadLab(
+    [
+      ["healthz", "/healthz"],
+      ["projects", "/api/projects"],
+      ["status", "/api/status"],
+    ].map(([name, path]) => new LoopbackTarget(name, path, `http://127.0.0.1:${port}`)),
+  ),
   publicDir: path.join(root, "public"),
   // Questions per visitor: a bucket this size that refills at the same rate per minute.
   askLimit: { capacity: askRate, refillPerMinute: askRate },

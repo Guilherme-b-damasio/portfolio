@@ -105,6 +105,8 @@ Portuguese stemmer (`src/infrastructure/search/portuguese-stemmer.ts`), so "trab
 | `GET /api/lab/ratelimit/bucket` | The lab bucket's balance, without spending |
 | `GET /api/lab/search?q=&k1=&b=&k=` | The search playground: the chat's own BM25 index ranked with the visitor's `k1` (0–3), `b` (0–1) and top-k (1–10), each hit with its rank under the server's defaults (`defaultRank`) and what every query term added to its score (`tf`, `df`, `idf`). 60 per visitor, refilling 2 a second. `search "<query>"` in the terminal draws sliders that rerank live |
 | `GET /api/lab/search/params` | The sliders' ranges and the server's own `k1`, `b` and `k` |
+| `POST /api/lab/load`      | The load lab: `{ target, requests ≤ 200, concurrency ≤ 10 }` fired by the server at one of its own routes over loopback (`healthz`, `projects`, `status`), streamed over SSE: `queued` with the position while another run is going, `start`, one `sample` per request (`status`, `ms`), then `done` with p50/p95/p99, max and req/s. One run at a time across every visitor, at most 5 waiting (503 + `Retry-After` past that), 30 s per run, 3 runs per visitor per minute. `load [n] [c]` in the terminal |
+| `GET /api/lab/load`       | Whether the load runner is busy, how many are waiting, the limits and the targets |
 | `GET /api/scan`           | What the bare request gives away (try it with curl); never cached |
 | `POST /api/scan`          | Same, plus the browser probe from `/voce`: findings where the layers contradict each other. 10 per visitor per minute |
 | `GET /api/scan/tls-samples` | Real ClientHellos captured from known clients (`data/tls-samples/`), with JA4 and every byte annotated |

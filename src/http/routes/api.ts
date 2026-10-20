@@ -6,6 +6,7 @@ import type { BrowsePortfolio } from "../../application/browse-portfolio.js";
 import type { BrowseTlsSamples } from "../../application/browse-tls-samples.js";
 import type { InspectCluster } from "../../application/inspect-cluster.js";
 import type { InspectVisitor } from "../../application/inspect-visitor.js";
+import type { LoadLab } from "../../application/load-lab.js";
 import type { ReportStatus } from "../../application/report-status.js";
 import type { SendContact } from "../../application/send-contact.js";
 import type { ShowEvals } from "../../application/show-evals.js";
@@ -21,6 +22,7 @@ import { clusterRouter } from "./cluster.js";
 import { contactRouter } from "./contact.js";
 import { evalsRouter } from "./evals.js";
 import { labRouter } from "./lab.js";
+import { loadLabRouter } from "./load-lab.js";
 import { scanRouter } from "./scan.js";
 import { searchLabRouter } from "./search-lab.js";
 
@@ -40,6 +42,7 @@ export interface ApiDeps {
   inspectCluster?: InspectCluster | null; // /api/cluster; without one it answers that the cluster is off
   traceDeploys?: TraceDeploys | null; // /api/deploys; both of its sources are cached upstream
   tuneSearch?: TuneSearch | null; // the search playground at /api/lab/search; off without a tunable index
+  loadLab?: LoadLab | null; // the load lab at /api/lab/load; one run at a time across every visitor
 }
 
 // A follow-up carries the last turns from the browser. Capped here so a visitor cannot inflate the prompt.
@@ -87,6 +90,7 @@ export function apiRouter(
     inspectCluster,
     traceDeploys,
     tuneSearch,
+    loadLab,
   }: ApiDeps,
   logger: Logger,
   { bucket: askBucket, gate: askGate }: AskGuards,
@@ -229,6 +233,7 @@ export function apiRouter(
   });
   api.use("/contact", contactRouter(sendContact, logger));
   if (tuneSearch) api.use("/lab/search", searchLabRouter(tuneSearch));
+  if (loadLab) api.use("/lab/load", loadLabRouter(loadLab, logger));
   api.use("/lab", labRouter());
   if (showEvals) api.use("/evals", evalsRouter(showEvals));
   api.use("/scan", scanRouter(inspectVisitor, tapped ?? null, tlsSamples ?? null));
