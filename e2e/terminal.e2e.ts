@@ -309,3 +309,29 @@ test("the cluster panel shows the node against its capacity and every visible po
   await expect(row).toContainText("portfolio/portfolio-7d9f-abcde");
   await expect(row).toContainText("2d");
 });
+
+test("ratelimit empties the lab bucket on the server and reads it back from the headers", async ({ page }) => {
+  // Its own setup: the 429s are the point here, so only errors outside the lab's endpoint fail it.
+  const errors: string[] = [];
+  page.on("pageerror", (err) => errors.push(err.message));
+  page.on("response", (res) => {
+    const { pathname } = new URL(res.url());
+    if (res.status() >= 400 && !(res.status() === 429 && pathname === "/api/lab/ratelimit"))
+      errors.push(`${res.status()} ${pathname}`);
+  });
+  page.on("console", (msg) => {
+    if (msg.type() === "error" && !msg.text().includes("429")) errors.push(msg.text());
+  });
+  await page.goto("/");
+  await run(page, "ratelimit");
+  const out = page.locator("#term-out");
+  await expect(out).toContainText("um balde de tokens só seu");
+  // Both projects share this address and the bucket holds ten: twenty shots always reach a 429.
+  await out.getByRole("button", { name: "dispara 10" }).click();
+  await expect(out).toContainText("x-ratelimit-remaining:");
+  await expect(out).toContainText(/\d+ aceitos, \d+ recusados com 429/);
+  await run(page, "ratelimit 10");
+  await expect(out.locator(".t-line", { hasText: "retry-after:" }).first()).toBeVisible();
+  await expect(out.locator(".t-line", { hasText: /aceitos/ })).toHaveCount(2);
+  expect(errors).toEqual([]);
+});

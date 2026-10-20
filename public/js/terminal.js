@@ -2,6 +2,8 @@ import { api, apiStream, lastTraceId, recordTraces } from "./api.js";
 import { el } from "./dom.js";
 import { collectProbe } from "./probe.js";
 import {
+  bucketFromHeaders,
+  bucketGlyphs,
   citationParts,
   commandForSource,
   deployStages,
@@ -36,12 +38,14 @@ const COMMANDS = [
   "status",
   "kubectl",
   "deploys",
+  "ratelimit",
   "trace",
   "scan",
   "curl",
   "open",
   "clear",
 ];
+const MAX_SHOTS = 10; // per `ratelimit n`; the server's bucket is the real limit
 const KUBECTL_WORDS = [["get"], ["pods", "nodes"], ["-n", "-A"]]; // what Tab offers after `kubectl`, by position
 const OPENABLE = PAGES.filter((p) => p !== "inicio");
 const CHIPS = ["whoami", "ls projects", 'ask "como funciona o docsage?"', "status", "curl /api/projects", "help"];
@@ -127,6 +131,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ["kubectl get pods", "os pods do cluster agora (-n <ns> ou -A; só leitura)"],
         ["kubectl get nodes", "o nó, com CPU e memória do metrics-server"],
         ["deploys", "commit → imagem → tag → Flux → pod pronto, dos últimos pushes"],
+        ["ratelimit [n]", "esvazia um balde de tokens no servidor, lido dos headers"],
         ["trace [id]", "cada etapa da última requisição (ou da do id)"],
         ["(clique num comando)", "abre o trace da requisição que ele fez"],
         ["scan", "o que este site sabe sobre você"],
@@ -480,6 +485,50 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
       }
       say(dim("tag: o cluster guarda os eventos do Flux por cerca de 1 h; antes disso aparece ?"));
       say(dim(`GitHub em cache por 5 min, cluster e Flux por 10 s · lido às ${body.readAt.slice(11, 19)} UTC`));
+    },
+
+    async ratelimit(args) {
+      const asked = args[0] === undefined ? 0 : Number(args[0]);
+      if (!Number.isInteger(asked) || asked < 0)
+        return say(warn("! "), "uso: ratelimit [n] · n de 1 a ", String(MAX_SHOTS));
+      if (!asked) {
+        const { res, body } = await api("/api/lab/ratelimit/bucket");
+        if (!res.ok) return failed(res.status);
+        say(dim("um balde de tokens só seu, no servidor: cada tiro gasta um, e ele volta a encher sozinho"));
+        say(
+          acc(bucketGlyphs(body.remaining, body.limit)),
+          dim(`  ${body.remaining}/${body.limit} · +1 a cada ${Math.round(60 / body.refillPerMinute)} s`),
+        );
+        return say(runButton("dispara 10", "ratelimit 10"), dim(" · "), runButton("dispara 1", "ratelimit 1"));
+      }
+      const shots = Math.min(asked, MAX_SHOTS);
+      if (asked > MAX_SHOTS) say(dim(`no máximo ${MAX_SHOTS} por vez: disparando ${MAX_SHOTS}`));
+      let accepted = 0;
+      for (let i = 1; i <= shots; i++) {
+        const { res } = await api("/api/lab/ratelimit");
+        const state = bucketFromHeaders(res.headers);
+        if (res.ok) accepted++;
+        else if (res.status !== 429) return failed(res.status);
+        print(
+          line([
+            dim(`#${String(i).padStart(2)} `),
+            (res.ok ? acc : warn)(String(res.status)),
+            "  ",
+            state ? (res.ok ? acc : warn)(bucketGlyphs(state.remaining, state.limit)) : "",
+            state
+              ? dim(
+                  res.ok
+                    ? `  x-ratelimit-remaining: ${state.remaining} · x-ratelimit-reset: ${state.reset ?? "?"}s`
+                    : `  retry-after: ${state.retryAfter ?? "?"}s`,
+                )
+              : "",
+          ]),
+        );
+      }
+      say(
+        dim(`${accepted} aceitos, ${shots - accepted} recusados com 429 · o balde está no servidor; `),
+        dim("o navegador só lê os headers"),
+      );
     },
 
     async trace(args) {

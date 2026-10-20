@@ -87,20 +87,24 @@ export function mcpRouter(deps: ApiDeps, askGuards: AskGuards) {
   const router = express.Router();
   const calls = new TokenBucket(60, 60);
 
-  router.post("/", rateLimit(calls), async (req, res, next) => {
-    const server = buildServer(deps, askGuards, req.ip ?? "unknown");
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-    res.on("close", () => {
-      void transport.close();
-      void server.close();
-    });
-    try {
-      await server.connect(transport);
-      await transport.handleRequest(req, res, req.body);
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.post(
+    "/",
+    rateLimit(calls, "Muitas chamadas MCP seguidas. Tenta de novo em instantes."),
+    async (req, res, next) => {
+      const server = buildServer(deps, askGuards, req.ip ?? "unknown");
+      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+      res.on("close", () => {
+        void transport.close();
+        void server.close();
+      });
+      try {
+        await server.connect(transport);
+        await transport.handleRequest(req, res, req.body);
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   // Stateless: no server-initiated stream (GET) and no session to end (DELETE).
   router.all("/", (_req, res) => {

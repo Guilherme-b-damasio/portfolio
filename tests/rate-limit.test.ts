@@ -18,7 +18,21 @@ describe("TokenBucket", () => {
     bucket.take("a");
     expect(bucket.peek("b").remaining).toBe(2);
     now = 10_000;
-    expect(bucket.peek("a")).toEqual({ limit: 2, remaining: 1, refillPerMinute: 6, retryAfterSeconds: 0 });
+    expect(bucket.peek("a")).toEqual({
+      limit: 2,
+      remaining: 1,
+      refillPerMinute: 6,
+      retryAfterSeconds: 0,
+      resetSeconds: 10,
+    });
+  });
+
+  it("says when the bucket is full again", () => {
+    const bucket = new TokenBucket(3, 6, () => 0);
+    expect(bucket.peek("a").resetSeconds).toBe(0);
+    bucket.take("a");
+    bucket.take("a");
+    expect(bucket.take("a").state.resetSeconds).toBe(30); // three tokens at one every 10s
   });
 
   it("peeking never spends", () => {

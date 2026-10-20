@@ -475,3 +475,22 @@ export const STAGE_MARKS = {
   skipped: "–",
   unknown: "?",
 };
+
+/** The bucket as a rate-limited response describes it in its headers; null when it carries none. */
+export function bucketFromHeaders(headers) {
+  const int = (name) => {
+    const value = headers.get(name);
+    return value !== null && /^\d{1,9}$/.test(value.trim()) ? Number(value) : null;
+  };
+  const limit = int("x-ratelimit-limit");
+  const remaining = int("x-ratelimit-remaining");
+  if (limit === null || remaining === null) return null;
+  return { limit, remaining, reset: int("x-ratelimit-reset"), retryAfter: int("retry-after") };
+}
+
+/** "●●●○○": the tokens left out of the bucket's size, capped so a large bucket stays one line. */
+export function bucketGlyphs(remaining, limit, max = 20) {
+  const size = Math.max(0, Math.min(limit, max));
+  const left = Math.max(0, Math.min(remaining, size));
+  return "●".repeat(left) + "○".repeat(size - left);
+}

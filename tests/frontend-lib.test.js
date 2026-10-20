@@ -2,6 +2,8 @@
 import { describe, expect, it } from "vitest";
 import {
   ago,
+  bucketFromHeaders,
+  bucketGlyphs,
   deployStages,
   formatGap,
   candidateAddress,
@@ -416,5 +418,45 @@ describe("deployStages", () => {
       "flux:done:rev 5",
       "pod:replaced:substituído",
     ]);
+  });
+});
+
+describe("rate limit lab helpers", () => {
+  // Lower-cased names, as fetch's Headers hands them out.
+  const Headers = class {
+    constructor(init = {}) {
+      this.map = new Map(Object.entries(init));
+    }
+    get(name) {
+      return this.map.get(name) ?? null;
+    }
+  };
+
+  it("reads the bucket from the response headers", () => {
+    const shot = new Headers({
+      "x-ratelimit-limit": "10",
+      "x-ratelimit-remaining": "0",
+      "x-ratelimit-reset": "30",
+      "retry-after": "3",
+    });
+    expect(bucketFromHeaders(shot)).toEqual({ limit: 10, remaining: 0, reset: 30, retryAfter: 3 });
+    expect(bucketFromHeaders(new Headers({ "x-ratelimit-limit": "10", "x-ratelimit-remaining": "7" }))).toEqual({
+      limit: 10,
+      remaining: 7,
+      reset: null,
+      retryAfter: null,
+    });
+  });
+
+  it("ignores responses without the headers or with garbage in them", () => {
+    expect(bucketFromHeaders(new Headers())).toBeNull();
+    expect(bucketFromHeaders(new Headers({ "x-ratelimit-limit": "ten", "x-ratelimit-remaining": "1" }))).toBeNull();
+  });
+
+  it("draws the tokens left, capped at a line", () => {
+    expect(bucketGlyphs(3, 5)).toBe("●●●○○");
+    expect(bucketGlyphs(0, 3)).toBe("○○○");
+    expect(bucketGlyphs(9, 3)).toBe("●●●");
+    expect(bucketGlyphs(50, 100)).toHaveLength(20);
   });
 });
