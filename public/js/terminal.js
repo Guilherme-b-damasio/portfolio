@@ -13,6 +13,7 @@ import {
   formatUptime,
   formatUsd,
   kubeAge,
+  latencyStrip,
   guessCommand,
   highlightParts,
   nodeRows,
@@ -40,6 +41,7 @@ const COMMANDS = [
   "kubectl",
   "deploys",
   "ratelimit",
+  "load",
   "search",
   "trace",
   "scan",
@@ -136,6 +138,10 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ["deploys", "commit → imagem → tag → Flux → pod pronto, dos últimos pushes"],
         ["ratelimit [n]", "esvazia um balde de tokens no servidor, lido dos headers"],
         ['search "<consulta>"', "o ranking BM25 ao vivo, com sliders de k1, b e top-k"],
+        [
+          "load [n] [c] [--target t]",
+          "n requisições (≤ 200), c por vez, contra este servidor; uma corrida por vez no total",
+        ],
         ["trace [id]", "cada etapa da última requisição (ou da do id)"],
         ["(clique num comando)", "abre o trace da requisição que ele fez"],
         ["scan", "o que este site sabe sobre você"],
@@ -533,6 +539,95 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         dim(`${accepted} aceitos, ${shots - accepted} recusados com 429 · o balde está no servidor; `),
         dim("o navegador só lê os headers"),
       );
+    },
+
+    async load(args) {
+      const { value, rest } = takeOption(args, "--target");
+      const target = value ?? "healthz";
+      if (!rest.length) {
+        const { res, body } = await api("/api/lab/load");
+        if (res.status === 404) return say(warn("! "), "o laboratório de carga está desligado neste servidor");
+        if (!res.ok) return failed(res.status);
+        const { requests, concurrency } = body.limits;
+        say(dim("dispara requisições do próprio servidor contra uma rota dele, em loopback, e mede cada uma"));
+        say(
+          dim("runner: "),
+          body.running ? warn("ocupado") : acc("livre"),
+          dim(
+            ` · fila: ${body.waiting}/${body.limits.maxWaiting} · até ${requests.max} requisições, ${concurrency.max} por vez`,
+          ),
+        );
+        say(dim("alvos: "), dim(body.targets.map((t) => `${t.name} (${t.path})`).join(" · ")));
+        return say(
+          runButton("load 50 5", "load 50 5"),
+          dim(" · "),
+          runButton("load 200 10", "load 200 10"),
+          dim(" · "),
+          runButton("load 100 10 --target projects", "load 100 10 --target projects"),
+        );
+      }
+      const [requests, concurrency = 5] = rest.map(Number);
+      if (!Number.isInteger(requests) || !Number.isInteger(concurrency) || target === "")
+        return say(
+          warn("! "),
+          "uso: load [n] [c] [--target healthz|projects|status] · ex: ",
+          runButton("load 50 5", "load 50 5"),
+        );
+
+      const progress = line([dim("enviando o plano…")]);
+      print(progress);
+      const samples = [];
+      let plan = null;
+      const show = (...segments) => {
+        progress.replaceChildren(...segments);
+        out.scrollTop = out.scrollHeight;
+      };
+      const { res, body } = await apiStream(
+        "/api/lab/load",
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ target, requests, concurrency }),
+        },
+        (event, data) => {
+          if (event === "queued")
+            show(warn("na fila "), dim(`posição ${data.position}: outra corrida está em andamento`));
+          else if (event === "start") {
+            plan = data;
+            say(dim(`GET ${data.path} · ${data.requests} requisições, ${data.concurrency} por vez, saindo do pod`));
+          } else if (event === "sample") {
+            samples.push(data);
+            const done = samples.length;
+            show(
+              acc(latencyStrip(samples)),
+              dim(`  ${String(done).padStart(3)}/${plan?.requests ?? "?"} · última ${formatMs(data.ms)}`),
+            );
+          }
+        },
+      );
+      if (!res.ok || body.error) {
+        progress.remove();
+        return res.status >= 500 && !body.error
+          ? failed(res.status)
+          : say(warn(`! ${res.status === 200 ? "" : res.status + " "}`), body.error);
+      }
+      say(
+        dim("p50 "),
+        acc(formatMs(body.p50Ms)),
+        dim(" · p95 "),
+        acc(formatMs(body.p95Ms)),
+        dim(" · p99 "),
+        acc(formatMs(body.p99Ms)),
+        dim(" · máx "),
+        text(formatMs(body.maxMs)),
+      );
+      say(
+        dim(`${body.ok} ok, `),
+        (body.failed ? warn : dim)(`${body.failed} falhas`),
+        dim(` · ${body.rps} req/s em ${formatMs(body.durationMs)}`),
+        body.timedOut ? warn("  · parou no limite de 30 s") : "",
+      );
+      say(dim("essas requisições entraram nas métricas do servidor: "), runButton("status", "status"));
     },
 
     async search(args) {

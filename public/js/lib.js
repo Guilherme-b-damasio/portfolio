@@ -102,6 +102,8 @@ export function edgesFor({ route, status, generated }) {
   if (route === "POST /mcp") return ["vi", "ia", "am"];
   // The search playground ranks the chat's own index, without generating anything.
   if (route === "GET /api/lab/search") return status === 200 ? ["vi", "ia", "ar", "rb"] : ["vi", "ia"];
+  // The load lab's requests go out from the server to itself; the visitor's own request stops at the API.
+  if (route === "POST /api/lab/load") return ["vi", "ia"];
   if (route.startsWith("GET /api/")) return ["vi", "ia", "am"];
   return ["vi", "ia"];
 }
@@ -508,4 +510,20 @@ export function rankShift(rank, defaultRank) {
 /** One query term's share of a BM25 score: "flux tf 2 · df 1 · idf 1.10 → 1.52". */
 export function explainTerm({ term, tf, df, idf, score }) {
   return `${term} tf ${tf} · df ${df} · idf ${idf.toFixed(2)} → ${score.toFixed(2)}`;
+}
+
+const BLOCKS = "▁▂▃▄▅▆▇█";
+
+/** The last `width` latencies as block characters, scaled to the slowest of them; failures (status 0 or ≥ 400) as "×". */
+export function latencyStrip(samples, width = 48) {
+  const recent = samples.slice(-width);
+  const failed = (s) => s.status === 0 || s.status >= 400;
+  const max = Math.max(...recent.filter((s) => !failed(s)).map((s) => s.ms), 0);
+  return recent
+    .map((s) => {
+      if (failed(s)) return "×";
+      const level = max > 0 ? Math.round((s.ms / max) * (BLOCKS.length - 1)) : 0;
+      return BLOCKS[level];
+    })
+    .join("");
 }

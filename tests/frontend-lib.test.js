@@ -22,6 +22,7 @@ import {
   formatMi,
   formatMilli,
   kubeAge,
+  latencyStrip,
   nodeRows,
   percentOf,
   podRows,
@@ -99,6 +100,16 @@ describe("front-end helpers", () => {
     expect(edgesFor({ route: "GET /api/projects/:slug", status: 404 })).toEqual(["vi", "ia"]);
     expect(edgesFor({ route: "GET /api/lab/search", status: 200 })).toEqual(["vi", "ia", "ar", "rb"]);
     expect(edgesFor({ route: "GET /api/lab/search", status: 429 })).toEqual(["vi", "ia"]);
+    expect(edgesFor({ route: "POST /api/lab/load", status: 200 })).toEqual(["vi", "ia"]);
+  });
+
+  it("draws load samples as blocks scaled to the slowest, failures as ×, keeping only the latest", () => {
+    const sample = (ms, status = 200) => ({ ms, status });
+    // A timed-out request (ms 2000) does not flatten the scale of the ones that answered.
+    expect(latencyStrip([sample(1), sample(4), sample(8), sample(2000, 0), sample(3, 503)])).toBe("▂▅█××");
+    expect(latencyStrip([sample(5), sample(1), sample(2)], 2)).toBe("▅█");
+    expect(latencyStrip([sample(0)])).toBe("▁");
+    expect(latencyStrip([])).toBe("");
   });
 
   it("says where a playground hit moved against the default ranking, and why it scored", () => {
