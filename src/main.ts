@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import https from "node:https";
 import type { Server } from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,6 +37,8 @@ import { ClaudeAnswerer } from "./infrastructure/llm/claude-answerer.js";
 import { DailyTokenBudget } from "./infrastructure/llm/daily-token-budget.js";
 import { ResendMailer } from "./infrastructure/mail/resend-mailer.js";
 import { InMemoryMetrics } from "./infrastructure/metrics/in-memory-metrics.js";
+import { AlpnServer } from "./infrastructure/http2/alpn-server.js";
+import { Http1Bridge } from "./infrastructure/http2/http1-bridge.js";
 import { DnsReverseLookup } from "./infrastructure/net/dns-reverse-lookup.js";
 import { FileTlsSamples } from "./infrastructure/tls/file-tls-samples.js";
 import { TlsTap } from "./infrastructure/tls/tls-tap.js";
@@ -187,14 +188,15 @@ let tlsServer: Server | null = null;
 if (tap && certFile && keyFile) {
   const tlsPort = Number(process.env.TLS_PORT ?? 8443);
   const credentials = () => ({ cert: readFileSync(certFile), key: readFileSync(keyFile) });
-  const httpsServer = https.createServer(credentials(), app);
-  tlsServer = tap.server(httpsServer).listen(tlsPort, () => {
-    logger.info("listening", { port: tlsPort, tls: "fingerprinted" });
+  // h2 and http/1.1 on the same port; h2 streams reach Express through an in-process HTTP/1.1 bridge.
+  const front = new AlpnServer(new Http1Bridge(app), credentials());
+  tlsServer = tap.server(front.server).listen(tlsPort, () => {
+    logger.info("listening", { port: tlsPort, tls: "fingerprinted", alpn: "h2,http/1.1" });
   });
   // cert-manager renews the mounted secret in place; pick the new files up without a restart.
   setInterval(() => {
     try {
-      httpsServer.setSecureContext(credentials());
+      front.server.setSecureContext(credentials());
     } catch (err) {
       logger.error("could not reload the TLS certificate", { error: (err as Error).message });
     }
