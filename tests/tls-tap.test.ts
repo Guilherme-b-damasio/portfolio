@@ -1,41 +1,11 @@
-import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import https from "node:https";
 import net from "node:net";
 import type { AddressInfo } from "node:net";
-import os from "node:os";
 import tls from "node:tls";
-import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TlsTap } from "../src/infrastructure/tls/tls-tap.js";
 import { proxyV2 } from "./fixtures/proxy-header.js";
-
-// A throwaway self-signed certificate, made with the openssl CLI. CI and Git for Windows both ship it.
-function selfSigned(): { key: Buffer; cert: Buffer } | null {
-  const dir = mkdtempSync(path.join(os.tmpdir(), "tap-"));
-  const file = (name: string) => path.join(dir, name);
-  try {
-    // Our own minimal config, so a stray OPENSSL_CONF on the machine can't break the test.
-    writeFileSync(file("req.cnf"), ["[req]", "distinguished_name = dn", "[dn]", ""].join("\n"));
-    const args = [
-      "req",
-      "-x509",
-      "-config",
-      file("req.cnf"),
-      "-newkey",
-      "ec",
-      "-pkeyopt",
-      "ec_paramgen_curve:prime256v1",
-    ];
-    args.push("-nodes", "-days", "1", "-subj", "/CN=localhost", "-keyout", file("k.pem"), "-out", file("c.pem"));
-    execFileSync("openssl", args, { stdio: "ignore" });
-    return { key: readFileSync(file("k.pem")), cert: readFileSync(file("c.pem")) };
-  } catch {
-    return null;
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-}
+import { selfSigned } from "./fixtures/self-signed.js";
 
 const creds = selfSigned();
 
