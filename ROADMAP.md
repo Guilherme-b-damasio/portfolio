@@ -85,6 +85,10 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
   - [x] PROXY protocol v1/v2 no tap, para o IP do visitante sobreviver ao passthrough
   - [x] Hex dump anotado do handshake em `/voce`, com galeria de handshakes reais
   - [ ] Fingerprint HTTP/2 (SETTINGS, WINDOW_UPDATE, ordem dos pseudo-headers)
+    - [x] Parser do prefácio do cliente (frames + nomes via HPACK) e fingerprint no formato da Akamai, com MD5
+    - [ ] Servir h2 na porta TLS (ALPN `h2` + `http/1.1`) e ler o prefácio depois da decifragem. O Express 5
+          não roda sobre o `http2` do Node, então o h2 precisa de uma ponte para o app (loopback HTTP/1.1)
+    - [ ] Mostrar o fingerprint HTTP/2 em `/voce` e no `scan`, com a contradição "UA diz Chrome, h2 diz nghttp2"
   - [x] Manifest de exemplo em `k8s/scan-tls-passthrough.example.yaml`
   - [ ] **[dono]** IngressRouteTCP com passthrough no Traefik e certificado montado no pod
 - [ ] Teste de vazamento de DNS: servidor DNS autoritativo próprio (UDP, `node:dgram`) para um subdomínio;
