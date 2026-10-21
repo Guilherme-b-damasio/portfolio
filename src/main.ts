@@ -147,6 +147,7 @@ const app = createApp({
   sendContact: new SendContact(mailer),
   inspectVisitor: new InspectVisitor(scanChecks(), new DnsReverseLookup()),
   tapped: tap,
+  http2: http2Connections,
   tlsSamples: new BrowseTlsSamples(await FileTlsSamples.load(path.join(root, "data", "tls-samples"))),
   metrics,
   logger,

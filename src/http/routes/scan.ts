@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { BrowseTlsSamples } from "../../application/browse-tls-samples.js";
 import type { InspectVisitor } from "../../application/inspect-visitor.js";
 import type { ClientProbe, Observation } from "../../domain/exposure.js";
+import type { Http2Connections } from "../../domain/http2.js";
 import type { TappedConnections } from "../../domain/tls.js";
 import { rateLimit, TokenBucket } from "../middleware/rate-limit.js";
 
@@ -60,22 +61,28 @@ const probeSchema = z.object({
   mediaDevices: z.object({ audioinput: count, audiooutput: count, videoinput: count }).optional(),
 });
 
-function observe(req: Request, tapped: TappedConnections | null): Observation {
+function observe(req: Request, tapped: TappedConnections | null, h2: Http2Connections | null): Observation {
   const headers: Record<string, string | undefined> = {};
   for (const [name, value] of Object.entries(req.headers)) {
     headers[name] = Array.isArray(value) ? value.join(", ") : value;
   }
   const viaProxy = req.headers["x-forwarded-for"] != null;
   const { remoteAddress, remotePort } = req.socket;
+  const peer = remoteAddress && remotePort ? ([remoteAddress, remotePort] as const) : null;
+  const http2 = peer && h2 ? h2.http2(...peer) : null;
+  // rawHeaders alternates name, value, in the order they arrived; a proxy would have re-written it.
+  let order = req.rawHeaders.filter((_, i) => i % 2 === 0).map((h) => h.toLowerCase());
+  // h2 has no Connection header: on a bridged request it is the in-process HTTP/1.1 hop's, not the visitor's.
+  if (http2) order = order.filter((h) => h !== "connection");
   return {
     ip: req.ip ?? remoteAddress ?? "",
     headers,
-    httpVersion: req.httpVersion,
+    httpVersion: http2 ? "2.0" : req.httpVersion,
     viaProxy,
     // Only a connection that reached our own TLS listener has a ClientHello on record.
-    tls: remoteAddress && remotePort ? (tapped?.fingerprint(remoteAddress, remotePort) ?? null) : null,
-    // rawHeaders alternates name, value, in the order they arrived; a proxy would have re-written it.
-    headerOrder: viaProxy ? null : req.rawHeaders.filter((_, i) => i % 2 === 0).map((h) => h.toLowerCase()),
+    tls: peer ? (tapped?.fingerprint(...peer) ?? null) : null,
+    headerOrder: viaProxy ? null : order,
+    http2,
   };
 }
 
@@ -87,6 +94,7 @@ export function scanRouter(
   inspectVisitor: InspectVisitor,
   tapped: TappedConnections | null = null,
   tlsSamples: BrowseTlsSamples | null = null,
+  http2: Http2Connections | null = null,
 ) {
   const router = express.Router();
   const bucket = new TokenBucket(10, 10); // a DNS lookup each: cheap, but not free
@@ -104,7 +112,7 @@ export function scanRouter(
 
   router.get("/", async (req, res, next) => {
     try {
-      res.json(await inspectVisitor.execute(observe(req, tapped), null));
+      res.json(await inspectVisitor.execute(observe(req, tapped, http2), null));
     } catch (err) {
       next(err);
     }
@@ -119,7 +127,7 @@ export function scanRouter(
       return;
     }
     try {
-      res.json(await inspectVisitor.execute(observe(req, tapped), parsed.data satisfies ClientProbe));
+      res.json(await inspectVisitor.execute(observe(req, tapped, http2), parsed.data satisfies ClientProbe));
     } catch (err) {
       next(err);
     }
