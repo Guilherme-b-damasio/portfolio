@@ -6,7 +6,11 @@ import { collectProbe } from "../probe.js";
 
 const LAYERS = [
   ["rede", "Rede", "O que chega antes de qualquer código: o IP e o nome dele."],
-  ["http", "HTTP", "Os cabeçalhos que o navegador manda em toda requisição."],
+  [
+    "http",
+    "HTTP",
+    "Os cabeçalhos que o navegador manda em toda requisição e, no HTTP/2, os primeiros frames da conexão.",
+  ],
   ["tls", "TLS", "O aperto de mão criptográfico, que denuncia a biblioteca de verdade."],
   ["navegador", "Navegador", "O que qualquer script lê sem pedir permissão."],
 ];
