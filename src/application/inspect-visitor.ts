@@ -10,6 +10,7 @@ import type {
   Verdict,
 } from "../domain/exposure.js";
 import { isGrease } from "../domain/tls.js";
+import { classifyHttp2, HTTP2_FAMILY_NAMES } from "./scan/http2-stack.js";
 import { addressKind, ipVersion, plainIp } from "./scan/ip.js";
 import { classifyStack, FAMILY_NAMES, tlsView } from "./scan/tls-stack.js";
 import { parseUserAgent } from "./scan/user-agent.js";
@@ -110,7 +111,21 @@ function httpSignals(observation: Observation): Signal[] {
   if (observation.headerOrder?.length) {
     headers.push({ layer: "http", label: "ordem dos cabeçalhos", value: observation.headerOrder.join(" → ") });
   }
-  return headers;
+  return [...headers, ...http2Signals(observation)];
+}
+
+function http2Signals({ http2 }: Observation): Signal[] {
+  if (!http2) return [];
+  const { preface } = http2;
+  const rows: [string, string][] = [
+    ["HTTP/2 (Akamai)", http2.akamai],
+    ["hash HTTP/2", http2.hash],
+    ["pilha h2 provável", HTTP2_FAMILY_NAMES[classifyHttp2(preface).family]],
+    ["SETTINGS", preface.settings.map((s) => `${s.name}=${s.value}`).join(", ") || "nenhum"],
+    ["WINDOW_UPDATE", preface.windowUpdate === null ? "nenhum" : String(preface.windowUpdate)],
+    ["pseudo-headers", preface.pseudoHeaders.join(" → ") || "nenhum"],
+  ];
+  return rows.map(([label, value]) => ({ layer: "http" as const, label, value }));
 }
 
 function tlsSignals({ tls }: Observation): Signal[] {

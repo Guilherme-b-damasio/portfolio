@@ -8,6 +8,7 @@ import {
   TimezoneCheck,
   UserAgentLayersCheck,
 } from "./browser.js";
+import { Http2StackCheck } from "./http2.js";
 import { ClientHintsCheck, LanguageCheck, PrivacySignalCheck, ToolClientCheck } from "./http.js";
 import { ReverseDnsCheck, WebRtcLeakCheck } from "./network.js";
 import { TlsStackCheck, TlsStrengthCheck } from "./tls.js";
@@ -19,6 +20,7 @@ export function scanChecks(): ExposureCheck[] {
     new WebRtcLeakCheck(),
     new TlsStackCheck(),
     new TlsStrengthCheck(),
+    new Http2StackCheck(),
     new ToolClientCheck(),
     new ClientHintsCheck(),
     new PrivacySignalCheck(),

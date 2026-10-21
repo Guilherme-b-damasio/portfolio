@@ -1,3 +1,4 @@
+import type { Http2Fingerprint } from "./http2.js";
 import type { TlsFingerprint, TlsView } from "./tls.js";
 
 /** Where a piece of evidence comes from, outermost first. */
@@ -18,6 +19,7 @@ export interface Observation {
   viaProxy: boolean; // behind Traefik: header order and TLS are re-made by the proxy
   tls: TlsFingerprint | null; // only when the connection reached our own TLS listener
   headerOrder: string[] | null; // header names as sent, only without a proxy in between
+  http2?: Http2Fingerprint | null; // only when the connection negotiated h2 with our own TLS listener
 }
 
 /** What the visitor's browser reported about itself. Every field is optional: scripts can be blocked or lie. */

@@ -163,6 +163,10 @@ doesn't run on Node's `http2` API, so each h2 stream is replayed to the app as H
 in-memory pipe that keeps the visitor's address, port and header order
 (`src/infrastructure/http2/`). Each connection is capped at 16 concurrent streams.
 
+The scan then checks the preface against the User-Agent, like it does with the ClientHello:
+tools that copy a browser's TLS handshake often forget this layer, so curl with a Chrome
+User-Agent shows up as `m,p,s,a` where Chrome sends `m,a,s,p` and asks for a 6 MB window.
+
 In the cluster this needs a TCP passthrough route that sends the PROXY protocol, so the app
 still learns the visitor's address: see `k8s/scan-tls-passthrough.example.yaml`. Until then
 `/voce` shows real handshakes captured from Chromium, Python, Node.js and curl on Windows.

@@ -39,6 +39,7 @@ import { ResendMailer } from "./infrastructure/mail/resend-mailer.js";
 import { InMemoryMetrics } from "./infrastructure/metrics/in-memory-metrics.js";
 import { AlpnServer } from "./infrastructure/http2/alpn-server.js";
 import { Http1Bridge } from "./infrastructure/http2/http1-bridge.js";
+import { TrackedHttp2Connections } from "./infrastructure/http2/tracked-http2-connections.js";
 import { DnsReverseLookup } from "./infrastructure/net/dns-reverse-lookup.js";
 import { FileTlsSamples } from "./infrastructure/tls/file-tls-samples.js";
 import { TlsTap } from "./infrastructure/tls/tls-tap.js";
@@ -125,6 +126,8 @@ const tagSelections =
       )
     : null;
 const tap = certFile && keyFile ? new TlsTap({ proxyProtocol: process.env.TLS_PROXY_PROTOCOL === "1" }) : null;
+// What each h2 connection opened with, filled by the TLS front below and read by the scan.
+const http2Connections = tap ? new TrackedHttp2Connections() : null;
 
 const app = createApp({
   browse: new BrowsePortfolio(content),
@@ -144,6 +147,7 @@ const app = createApp({
   sendContact: new SendContact(mailer),
   inspectVisitor: new InspectVisitor(scanChecks(), new DnsReverseLookup()),
   tapped: tap,
+  http2: http2Connections,
   tlsSamples: new BrowseTlsSamples(await FileTlsSamples.load(path.join(root, "data", "tls-samples"))),
   metrics,
   logger,
@@ -185,11 +189,11 @@ const server = app.listen(port, () => {
 });
 
 let tlsServer: Server | null = null;
-if (tap && certFile && keyFile) {
+if (tap && http2Connections && certFile && keyFile) {
   const tlsPort = Number(process.env.TLS_PORT ?? 8443);
   const credentials = () => ({ cert: readFileSync(certFile), key: readFileSync(keyFile) });
   // h2 and http/1.1 on the same port; h2 streams reach Express through an in-process HTTP/1.1 bridge.
-  const front = new AlpnServer(new Http1Bridge(app), credentials());
+  const front = new AlpnServer(new Http1Bridge(app), credentials(), http2Connections);
   tlsServer = tap.server(front.server).listen(tlsPort, () => {
     logger.info("listening", { port: tlsPort, tls: "fingerprinted", alpn: "h2,http/1.1" });
   });

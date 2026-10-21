@@ -13,6 +13,7 @@ import type { ShowEvals } from "../../application/show-evals.js";
 import type { ShowTrace } from "../../application/show-trace.js";
 import type { TraceDeploys } from "../../application/trace-deploys.js";
 import type { TuneSearch } from "../../application/tune-search.js";
+import type { Http2Connections } from "../../domain/http2.js";
 import type { Logger } from "../../domain/logger.js";
 import type { TappedConnections } from "../../domain/tls.js";
 import { concurrencyCap, ConcurrencyGate } from "../middleware/concurrency.js";
@@ -34,6 +35,7 @@ export interface ApiDeps {
   inspectVisitor: InspectVisitor;
   tapped?: TappedConnections | null; // set when the app also serves TLS itself
   tlsSamples?: BrowseTlsSamples | null;
+  http2?: Http2Connections | null; // h2 prefaces read on that same TLS listener
   askLimit?: { capacity: number; refillPerMinute: number };
   askConcurrency?: number; // questions answered at once, across every visitor
   askTimeoutMs?: number; // generation is aborted past this, streamed or not
@@ -84,6 +86,7 @@ export function apiRouter(
     inspectVisitor,
     tapped,
     tlsSamples,
+    http2,
     askTimeoutMs = 60_000,
     showEvals,
     showTrace,
@@ -236,7 +239,7 @@ export function apiRouter(
   if (loadLab) api.use("/lab/load", loadLabRouter(loadLab, logger));
   api.use("/lab", labRouter());
   if (showEvals) api.use("/evals", evalsRouter(showEvals));
-  api.use("/scan", scanRouter(inspectVisitor, tapped ?? null, tlsSamples ?? null));
+  api.use("/scan", scanRouter(inspectVisitor, tapped ?? null, tlsSamples ?? null, http2 ?? null));
 
   return api;
 }
