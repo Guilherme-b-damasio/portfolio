@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AlpnServer } from "../src/infrastructure/http2/alpn-server.js";
 import { duplexPair } from "../src/infrastructure/http2/duplex-pair.js";
 import { Http1Bridge } from "../src/infrastructure/http2/http1-bridge.js";
+import { TrackedHttp2Connections } from "../src/infrastructure/http2/tracked-http2-connections.js";
 import { TlsTap } from "../src/infrastructure/tls/tls-tap.js";
 import { selfSigned } from "./fixtures/self-signed.js";
 
@@ -33,7 +34,7 @@ describe("duplexPair", () => {
 
 describe.skipIf(!creds)("h2 and HTTP/1.1 on the same TLS port, behind the tap", () => {
   const tap = new TlsTap({ helloTimeoutMs: 1_000 });
-  let alpn: AlpnServer;
+  const connections = new TrackedHttp2Connections();
   let tcp: Server;
   let origin: string;
 
@@ -49,7 +50,7 @@ describe.skipIf(!creds)("h2 and HTTP/1.1 on the same TLS port, behind the tap", 
         host: req.headers.host,
         order: req.rawHeaders.filter((_, i) => i % 2 === 0).map((h) => h.toLowerCase()),
         ja4: tap.fingerprint(remoteAddress!, remotePort!)?.ja4 ?? null,
-        h2: alpn.http2(remoteAddress!, remotePort!)?.akamai ?? null,
+        h2: connections.http2(remoteAddress!, remotePort!)?.akamai ?? null,
       });
     });
     app.post("/echo", (req, res) => res.status(201).json(req.body));
@@ -58,8 +59,8 @@ describe.skipIf(!creds)("h2 and HTTP/1.1 on the same TLS port, behind the tap", 
       res.write("data: 1\n\n");
       setTimeout(() => res.end("data: 2\n\n"), 20);
     });
-    alpn = new AlpnServer(new Http1Bridge(app), creds!, { prefaceTimeoutMs: 300 });
-    tcp = tap.server(alpn.server).listen(0, "127.0.0.1");
+    const front = new AlpnServer(new Http1Bridge(app), creds!, connections, { prefaceTimeoutMs: 300 });
+    tcp = tap.server(front.server).listen(0, "127.0.0.1");
     await new Promise((r) => tcp.once("listening", r));
     origin = `https://127.0.0.1:${(tcp.address() as AddressInfo).port}`;
   });
@@ -145,7 +146,7 @@ describe.skipIf(!creds)("h2 and HTTP/1.1 on the same TLS port, behind the tap", 
     });
     expect(closedAfter).toBeGreaterThanOrEqual(250);
     await new Promise((r) => setTimeout(r, 50));
-    expect(alpn.tracked).toBe(0);
+    expect(connections.tracked).toBe(0);
   });
 
   it("lets the HTTP/2 server turn away bytes that aren't a preface", async () => {
