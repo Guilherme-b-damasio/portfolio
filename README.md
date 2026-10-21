@@ -34,7 +34,7 @@ Portuguese stemmer (`src/infrastructure/search/portuguese-stemmer.ts`), so "trab
 | `ANTHROPIC_API_KEY` | unset             | Enables generated answers; without it `/api/ask` returns only the retrieved passages |
 | `CLAUDE_MODEL`      | `claude-opus-5-5` | Model used by `/api/ask`                             |
 | `LLM_DAILY_TOKEN_BUDGET` | `200000`    | LLM tokens (input + output) per UTC day; past it `/api/ask` returns only the passages, with `degraded: "token-budget"`, until 00:00 UTC |
-| `TLS_CERT_FILE`, `TLS_KEY_FILE` | unset | Also serve HTTPS on `TLS_PORT` (default `8443`) and fingerprint each visitor's TLS handshake. Re-read every 6 h |
+| `TLS_CERT_FILE`, `TLS_KEY_FILE` | unset | Also serve HTTPS on `TLS_PORT` (default `8443`, h2 and HTTP/1.1) and fingerprint each visitor's TLS handshake and HTTP/2 preface. Re-read every 6 h |
 | `TLS_PROXY_PROTOCOL` | unset | `1` when that port sits behind a TCP passthrough that sends the PROXY protocol; the header then becomes mandatory |
 | `ASK_RATE_PER_MINUTE` | `5`             | Questions per visitor: a bucket of this size that refills at this rate per minute (HTTP and MCP share it) |
 | `ASK_MAX_CONCURRENCY` | `4`             | Questions answered at once across every visitor (HTTP and MCP); above it, 503 with `Retry-After` |
@@ -153,6 +153,15 @@ ClientHello before handing the socket to the HTTPS server: the parser in
 spec's worked example), and the scan compares the TLS library that wrote the handshake with the
 browser the User-Agent claims. A curl or Python script wearing a Chrome User-Agent shows up as a
 contradiction. The raw header order is also reported, since no proxy rewrote it.
+
+That port offers `h2` as well as `http/1.1`. On an h2 connection the first decrypted bytes (the
+client preface up to its first request) are read and fingerprinted in
+Akamai's format ("Passive Fingerprinting of HTTP/2 Clients", Black Hat EU 2017):
+SETTINGS, the connection's WINDOW_UPDATE, PRIORITY frames and the pseudo-header order, which
+differs between Chrome (`m,a,s,p`), Firefox (`m,p,a,s`), Safari and HTTP libraries. Express 5
+doesn't run on Node's `http2` API, so each h2 stream is replayed to the app as HTTP/1.1 over an
+in-memory pipe that keeps the visitor's address, port and header order
+(`src/infrastructure/http2/`). Each connection is capped at 16 concurrent streams.
 
 In the cluster this needs a TCP passthrough route that sends the PROXY protocol, so the app
 still learns the visitor's address: see `k8s/scan-tls-passthrough.example.yaml`. Until then

@@ -42,3 +42,8 @@ export interface Http2Fingerprint {
   hash: string; // MD5 of `akamai`, the form most fingerprint databases index
   preface: Http2Preface;
 }
+
+/** The HTTP/2 fingerprint of a connection, looked up by its peer's address; null for HTTP/1.1 connections. */
+export interface Http2Connections {
+  http2(remoteAddress: string, remotePort: number): Http2Fingerprint | null;
+}
