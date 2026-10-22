@@ -4,6 +4,7 @@ import { copyText, el } from "../dom.js";
 import { createHexDump } from "../hexdump.js";
 import { resolverParts, scanHeadline, VERDICTS } from "../lib.js";
 import { collectProbe } from "../probe.js";
+import { candidateParts, runStun } from "../stun.js";
 
 const LAYERS = [
   ["rede", "Rede", "O que chega antes de qualquer código: o IP e o nome dele."],
@@ -260,7 +261,79 @@ export function createVocePage({ root }) {
     );
   }
 
+  async function testStun() {
+    const button = $("#stun-run");
+    if (button.disabled) return;
+    button.disabled = true;
+    $("#stun-result").setAttribute("aria-busy", "true");
+    $("#stun-result").replaceChildren(el("p", { class: "muted" }, "perguntando quais sockets existem…"));
+    try {
+      const result = await runStun({
+        onGather: (urls) => {
+          $("#stun-servers").textContent = urls.join(" · ");
+          $("#stun-result").replaceChildren(el("p", { class: "muted" }, "falando UDP com os dois sockets…"));
+        },
+      });
+      if (result.off) {
+        $("#stun-result").replaceChildren(
+          el("p", {}, "O teste está desligado neste servidor: as portas UDP ainda não estão abertas para ele."),
+        );
+      } else if (result.error) {
+        $("#stun-result").replaceChildren(el("p", {}, result.error));
+      } else {
+        renderStun(result.report, result.candidates);
+      }
+    } catch {
+      $("#stun-result").replaceChildren(el("p", {}, "Não consegui falar com o servidor."));
+    } finally {
+      button.disabled = false;
+      button.textContent = "testar de novo";
+      $("#stun-result").setAttribute("aria-busy", "false");
+    }
+  }
+
+  function renderStun(report, candidates) {
+    $("#stun-result").replaceChildren(
+      el(
+        "div",
+        { class: "finding", attrs: { "data-verdict": report.verdict } },
+        el(
+          "div",
+          { class: "finding-head" },
+          el("span", { class: "verdict" }, VERDICTS[report.verdict] ?? report.verdict),
+          el("span", { class: "mono muted small" }, "rede"),
+        ),
+        el("h3", {}, report.headline),
+        el("p", {}, report.detail),
+      ),
+      el(
+        "dl",
+        { class: "signal-list" },
+        el("div", { class: "fact-row" }, el("dt", {}, "você (HTTP)"), el("dd", {}, report.you.ip)),
+        // What our own sockets saw, which is the half nobody can fake from the page.
+        report.sightings.map((s) =>
+          el(
+            "div",
+            { class: "fact-row" },
+            el("dt", {}, `visto nas portas ${s.serverPorts.join(" e ")}`),
+            el("dd", {}, `porta ${s.port}`),
+          ),
+        ),
+        candidates.map((c) => {
+          const p = candidateParts(c);
+          return el(
+            "div",
+            { class: "fact-row" },
+            el("dt", {}, "candidato do navegador"),
+            el("dd", {}, `${p.where} · ${p.local}`),
+          );
+        }),
+      ),
+    );
+  }
+
   $("#dns-run").addEventListener("click", testDns);
+  $("#stun-run").addEventListener("click", testStun);
   $("#scan-run").addEventListener("click", scan);
   $("#scan-nojs").addEventListener("change", scan);
   $("#scan-curl").textContent = `curl -s ${location.origin}/api/scan | jq '.findings[] | {verdict, title}'`;

@@ -1,0 +1,42 @@
+# Optional: the NAT test on /voce and `stun`.
+#
+# The app is its own STUN server (RFC 8489) on two UDP ports. Two are the point: a browser that
+# reaches both shows whether its NAT keeps one port for every destination or picks a new one each
+# time, and that is the difference between a peer-to-peer call working and needing a relay.
+#
+# Not applied by anything in this repo. To use it, copy into the infra repo and patch the
+# Deployment as shown at the bottom. Both ports must be open on the node, UDP.
+apiVersion: v1
+kind: Service
+metadata:
+  name: portfolio-stun
+  namespace: portfolio
+spec:
+  # k3s's ServiceLB (klipper-lb) binds the ports on the node and forwards them to the pod.
+  type: LoadBalancer
+  # Keeps the sender's address and port: the whole test is about which address and port the
+  # visitor's NAT used, so a SNAT'd source would answer with the node's own mapping instead.
+  externalTrafficPolicy: Local
+  selector: { app: portfolio }
+  ports:
+    - { port: 3478, targetPort: stun-a, protocol: UDP, name: stun-a }
+    - { port: 3479, targetPort: stun-b, protocol: UDP, name: stun-b }
+# ---
+# Deployment patch (container "web"):
+#   ports:
+#     - { containerPort: 13478, protocol: UDP, name: stun-a }
+#     - { containerPort: 13479, protocol: UDP, name: stun-b }
+#   env:
+#     - { name: STUN_PORTS, value: "13478,13479" } # unprivileged: the pod runs as non-root
+#     - { name: STUN_PUBLIC_PORTS, value: "3478,3479" } # what the browser is told to aim at
+#     - { name: STUN_PUBLIC_ADDRESS, value: "<the node's public IPv4>" } # TODO, for OTHER-ADDRESS
+#
+# The server answers Binding requests and nothing else, stays silent on anything that is not one
+# (so the port cannot be used to reflect traffic), answers with little more than it was asked, and
+# drops everything past STUN_MAX_RPS (200 a second). Memory: a few hundred KB for the 2 000
+# addresses it keeps at most, each for two minutes.
+#
+# One caveat with more than one replica: the UDP and the HTTP read that follows it can land on
+# different pods, and each pod only reports what it saw itself, so the test would come back empty
+# about as often as not. Like the rate limit, it assumes the single replica in deployment.yaml;
+# more replicas need a shared store, not affinity on this Service alone.

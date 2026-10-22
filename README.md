@@ -231,8 +231,10 @@ carry UDP looks like.
 The server answers Binding requests and nothing else: it stays silent on anything that is not one
 (the port is a reflection vector otherwise), answers with little more than it was asked, drops
 everything past `STUN_MAX_RPS`, and keeps each address's sightings in memory for two minutes, at
-most 2 000 addresses. In the cluster this needs UDP reaching the pod: see `k8s/stun.example.yaml`.
-To try it locally:
+most 2 000 addresses. On `/voce` the "Seu NAT" section (and `stun` in the terminal) runs the test
+on demand: the page opens a short-lived `RTCPeerConnection` pointed at both sockets and closes it
+as soon as the candidates are in. In the cluster this needs UDP reaching the pod: see
+`k8s/stun.example.yaml`. To try it locally:
 
 ```bash
 STUN_PORTS=3478,3479 npm run dev
