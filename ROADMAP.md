@@ -101,6 +101,13 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
   - [x] Manifest de exemplo (Service UDP 53) em `k8s/dns-leak.example.yaml`
   - [ ] **[dono]** Delegação NS do subdomínio e porta 53/udp exposta no cluster
 - [ ] STUN próprio (RFC 8489 em `node:dgram`): IP público real via WebRTC e tipo de NAT, sem depender do Google
+  - [x] Mensagens STUN (XOR-MAPPED-ADDRESS, FINGERPRINT) e servidor UDP que só responde a Binding,
+        com teto global de requisições, sem reflexão e guardando quem perguntou por poucos minutos
+  - [ ] Caso de uso + `/api/stun`: o que os dois sockets viram do seu IP, o mapeamento do NAT
+        (porta fixa x porta por destino) e a comparação com o IP desta página
+  - [ ] Seção em `/voce` e comando `stun` no terminal, com o navegador juntando candidatos ICE
+        contra estes dois servidores
+  - [ ] Manifest de exemplo (Service UDP) em `k8s/stun.example.yaml`
   - [ ] **[dono]** Porta UDP exposta no cluster
 - [ ] Inteligência de IP: nós de saída do Tor e faixas de datacenter (AWS/GCP/Azure), com refresh limitado
 - [ ] Anonimato agregado: "1 em N visitantes tem sua GPU", com contagens por atributo em memória e sem fingerprint individual
