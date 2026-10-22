@@ -1,7 +1,8 @@
 import { api } from "../api.js";
+import { runDnsLeak } from "../dns-leak.js";
 import { copyText, el } from "../dom.js";
 import { createHexDump } from "../hexdump.js";
-import { scanHeadline, VERDICTS } from "../lib.js";
+import { resolverParts, scanHeadline, VERDICTS } from "../lib.js";
 import { collectProbe } from "../probe.js";
 
 const LAYERS = [
@@ -189,6 +190,77 @@ export function createVocePage({ root }) {
     return "Nada nesta camada.";
   }
 
+  async function testDns() {
+    const button = $("#dns-run");
+    if (button.disabled) return;
+    button.disabled = true;
+    $("#dns-result").setAttribute("aria-busy", "true");
+    $("#dns-result").replaceChildren(el("p", { class: "muted" }, "pedindo um nome novo…"));
+    try {
+      const result = await runDnsLeak({
+        onProbe: (hostname) => {
+          $("#dns-name").textContent = hostname;
+          $("#dns-result").replaceChildren(
+            el("p", { class: "muted" }, "resolvendo e esperando o resolvedor perguntar…"),
+          );
+        },
+      });
+      if (result.off) {
+        $("#dns-result").replaceChildren(
+          el("p", {}, "O teste está desligado neste servidor: o subdomínio ainda não foi delegado a ele."),
+        );
+      } else if (result.error) {
+        $("#dns-result").replaceChildren(el("p", {}, result.error));
+      } else {
+        renderDns(result.report);
+      }
+    } catch {
+      $("#dns-result").replaceChildren(el("p", {}, "Não consegui falar com o servidor."));
+    } finally {
+      button.disabled = false;
+      button.textContent = "testar de novo";
+      $("#dns-result").setAttribute("aria-busy", "false");
+    }
+  }
+
+  function renderDns(report) {
+    $("#dns-result").replaceChildren(
+      el(
+        "div",
+        { class: "finding", attrs: { "data-verdict": report.verdict } },
+        el(
+          "div",
+          { class: "finding-head" },
+          el("span", { class: "verdict" }, VERDICTS[report.verdict] ?? report.verdict),
+          el("span", { class: "mono muted small" }, "dns"),
+        ),
+        el("h3", {}, report.headline),
+        el("p", {}, report.detail),
+      ),
+      // The page's own address is always there, so the resolvers have something to be compared with.
+      el(
+        "dl",
+        { class: "signal-list" },
+        el(
+          "div",
+          { class: "fact-row" },
+          el("dt", {}, "você (HTTP)"),
+          el("dd", {}, [report.you.ip, report.you.reverseDns].filter(Boolean).join(" · ")),
+        ),
+        report.resolvers.map((r) => {
+          const p = resolverParts(r);
+          return el(
+            "div",
+            { class: "fact-row" },
+            el("dt", {}, `resolvedor ${p.relation}`),
+            el("dd", {}, `${p.who} · ${p.qtypes}${p.subnet ? " · " + p.subnet : ""}`),
+          );
+        }),
+      ),
+    );
+  }
+
+  $("#dns-run").addEventListener("click", testDns);
   $("#scan-run").addEventListener("click", scan);
   $("#scan-nojs").addEventListener("change", scan);
   $("#scan-curl").textContent = `curl -s ${location.origin}/api/scan | jq '.findings[] | {verdict, title}'`;

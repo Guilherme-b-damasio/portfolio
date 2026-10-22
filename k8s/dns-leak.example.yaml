@@ -1,0 +1,36 @@
+# Optional: the DNS leak test on /voce and `dnsleak`.
+#
+# The app answers, over UDP, for one small zone that the parent zone delegates to it. In the
+# parent zone (at the DNS provider), two records do the delegation:
+#
+#   leak.portfolio.example.com.     NS  ns.leak.portfolio.example.com.
+#   ns.leak.portfolio.example.com.  A   <the node's public IPv4>   (glue)
+#
+# Not applied by anything in this repo. To use it, copy into the infra repo, replace the zone,
+# and patch the Deployment as shown at the bottom. Port 53/udp must be open on the node.
+apiVersion: v1
+kind: Service
+metadata:
+  name: portfolio-dns
+  namespace: portfolio
+spec:
+  # k3s's ServiceLB (klipper-lb) binds 53/udp on the node and forwards it to the pod.
+  type: LoadBalancer
+  # Keeps the sender's address: the test is about which resolver asked, so a SNAT'd source would
+  # make every resolver look like the node itself.
+  externalTrafficPolicy: Local
+  selector: { app: portfolio }
+  ports: [{ port: 53, targetPort: dns, protocol: UDP, name: dns }]
+# ---
+# Deployment patch (container "web"):
+#   ports:
+#     - { containerPort: 8053, protocol: UDP, name: dns }
+#   env:
+#     - { name: DNS_LEAK_ZONE, value: leak.portfolio.example.com } # TODO: your zone
+#     - { name: DNS_LEAK_NS_ADDRESS, value: "<the node's public IPv4>" } # TODO, same as the glue record
+#     - { name: DNS_PORT, value: "8053" } # unprivileged: the pod runs as non-root
+#
+# Probe names answer NODATA unless DNS_LEAK_ANSWER_A is set, which is enough: the browser still
+# has to ask. The server answers at most DNS_MAX_QPS (200) queries a second, only for its zone,
+# and never with more bytes than it was asked, so it is not an amplifier. Memory: a few hundred
+# KB for the 2 000 probes it keeps at most.

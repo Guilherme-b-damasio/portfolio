@@ -30,6 +30,8 @@ import {
   parseSse,
   rankShift,
   rememberTurn,
+  leakProbeUrl,
+  resolverParts,
   routeLabel,
   scanHeadline,
   scoreBar,
@@ -89,6 +91,7 @@ describe("front-end helpers", () => {
   it("groups project routes like the server metrics", () => {
     expect(routeLabel("GET", "/api/projects/docsage")).toBe("GET /api/projects/:slug");
     expect(routeLabel("GET", "/api/projects?tag=ia")).toBe("GET /api/projects");
+    expect(routeLabel("GET", "/api/dns-leak/0123456789abcdef")).toBe("GET /api/dns-leak/:token");
   });
 
   it("lights the claude edge only when an answer was generated", () => {
@@ -480,5 +483,45 @@ describe("rate limit lab helpers", () => {
     expect(bucketGlyphs(0, 3)).toBe("○○○");
     expect(bucketGlyphs(9, 3)).toBe("●●●");
     expect(bucketGlyphs(50, 100)).toHaveLength(20);
+  });
+});
+
+describe("DNS leak helpers", () => {
+  it("describes each resolver by who it is, how it relates to you and what it forwarded", () => {
+    const google = {
+      address: "172.253.4.9",
+      reverseDns: null,
+      operator: "Google",
+      relation: "publico",
+      qtypes: ["A", "AAAA"],
+      clientSubnet: { family: 4, address: "189.100.20.0", prefix: 24 },
+      subnetHasYou: false,
+    };
+    expect(resolverParts(google)).toEqual({
+      who: "172.253.4.9",
+      relation: "Google (público)",
+      subnet: "repassou 189.100.20.0/24, que não é a sua rede",
+      qtypes: "A, AAAA",
+    });
+    const isp = {
+      address: "201.17.0.53",
+      reverseDns: "dns1.virtua.com.br",
+      operator: null,
+      relation: "mesma-rede",
+      qtypes: ["A"],
+      clientSubnet: null,
+      subnetHasYou: null,
+    };
+    expect(resolverParts(isp)).toMatchObject({
+      who: "201.17.0.53 · dns1.virtua.com.br",
+      relation: "da sua rede",
+      subnet: null,
+    });
+  });
+
+  it("points the probe image at the name over https, never cached", () => {
+    expect(leakProbeUrl("0123456789abcdef.leak.example.test", 42)).toBe(
+      "https://0123456789abcdef.leak.example.test/p.gif?42",
+    );
   });
 });

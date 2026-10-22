@@ -1,5 +1,6 @@
 import { api, apiStream, lastTraceId, recordTraces } from "./api.js";
 import { el } from "./dom.js";
+import { runDnsLeak } from "./dns-leak.js";
 import { collectProbe } from "./probe.js";
 import { createSearchPlayground } from "./search-playground.js";
 import {
@@ -21,6 +22,7 @@ import {
   parseLine,
   podRows,
   rememberTurn,
+  resolverParts,
   scanHeadline,
   scoreBar,
   sections,
@@ -45,6 +47,7 @@ const COMMANDS = [
   "search",
   "trace",
   "scan",
+  "dnsleak",
   "curl",
   "open",
   "clear",
@@ -145,6 +148,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ["trace [id]", "cada etapa da última requisição (ou da do id)"],
         ["(clique num comando)", "abre o trace da requisição que ele fez"],
         ["scan", "o que este site sabe sobre você"],
+        ["dnsleak", "qual resolvedor DNS você usa de verdade (VPN vazando?)"],
         ["curl <caminho>", "chama a API crua, ex: curl /api/profile"],
         ["open <página>", OPENABLE.join(" · ")],
         ["clear", "limpa a tela"],
@@ -708,6 +712,32 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         dim(`${ok} verificações ok · ${body.summary.checks} regras · nada foi salvo  `),
         runButton("ver evidências em /voce", "open voce"),
       );
+    },
+
+    async dnsleak() {
+      const loading = line([acc("·   "), dim("pedindo um nome novo…")]);
+      print(loading);
+      const result = await runDnsLeak({
+        onProbe: (hostname) => loading.replaceChildren(acc("·   "), dim(`resolvendo ${hostname}…`)),
+      });
+      loading.remove();
+      if (result.off) return say(dim("o teste de DNS está desligado neste servidor: falta delegar a zona"));
+      if (result.error) return say(warn("! "), result.error);
+      const { report, hostname } = result;
+      say(
+        dim(`nome: ${hostname} · você: ${report.you.ip}${report.you.reverseDns ? " · " + report.you.reverseDns : ""}`),
+      );
+      const mark = { contradicao: "✗", exposto: "!", info: "·", ok: "✓" }[report.verdict];
+      say(
+        report.verdict === "ok" || report.verdict === "info"
+          ? bold(`${mark} ${report.headline}`)
+          : warn(`${mark} ${report.headline}`),
+      );
+      for (const r of report.resolvers) {
+        const p = resolverParts(r);
+        print(line([acc(p.who.padEnd(24)), `${p.relation} · ${p.qtypes}`, p.subnet ? warn(` · ${p.subnet}`) : ""]));
+      }
+      say(dim(report.detail));
     },
 
     async curl(args) {
