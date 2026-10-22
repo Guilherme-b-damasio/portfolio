@@ -93,6 +93,12 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
   - [ ] **[dono]** IngressRouteTCP com passthrough no Traefik e certificado montado no pod
 - [ ] Teste de vazamento de DNS: servidor DNS autoritativo próprio (UDP, `node:dgram`) para um subdomínio;
       a página resolve um nome aleatório e mostra qual resolvedor perguntou (provedor x VPN)
+  - [x] Servidor autoritativo UDP para a zona (SOA/NS, nomes de sonda, EDNS Client Subnet), que só registra
+        sondas emitidas, com teto global de consultas e respostas sem amplificação
+  - [ ] Caso de uso + `/api/dns-leak` (emitir sonda, ler resolvedores com PTR e "mesma rede que você?"),
+        ligado no `main.ts` por `DNS_LEAK_ZONE`, com a zona liberada na CSP
+  - [ ] Seção em `/voce` e comando `dnsleak` no terminal
+  - [ ] Manifest de exemplo (Service UDP 53) em `k8s/dns-leak.example.yaml`
   - [ ] **[dono]** Delegação NS do subdomínio e porta 53/udp exposta no cluster
 - [ ] STUN próprio (RFC 8489 em `node:dgram`): IP público real via WebRTC e tipo de NAT, sem depender do Google
   - [ ] **[dono]** Porta UDP exposta no cluster
