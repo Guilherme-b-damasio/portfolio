@@ -1,6 +1,7 @@
 import { api, apiStream, lastTraceId, recordTraces } from "./api.js";
 import { el } from "./dom.js";
 import { runDnsLeak } from "./dns-leak.js";
+import { candidateParts, runStun } from "./stun.js";
 import { collectProbe } from "./probe.js";
 import { createSearchPlayground } from "./search-playground.js";
 import {
@@ -48,6 +49,7 @@ const COMMANDS = [
   "trace",
   "scan",
   "dnsleak",
+  "stun",
   "curl",
   "open",
   "clear",
@@ -149,6 +151,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ["(clique num comando)", "abre o trace da requisição que ele fez"],
         ["scan", "o que este site sabe sobre você"],
         ["dnsleak", "qual resolvedor DNS você usa de verdade (VPN vazando?)"],
+        ["stun", "como o seu NAT te mapeia, medido por dois sockets UDP deste servidor"],
         ["curl <caminho>", "chama a API crua, ex: curl /api/profile"],
         ["open <página>", OPENABLE.join(" · ")],
         ["clear", "limpa a tela"],
@@ -736,6 +739,32 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
       for (const r of report.resolvers) {
         const p = resolverParts(r);
         print(line([acc(p.who.padEnd(24)), `${p.relation} · ${p.qtypes}`, p.subnet ? warn(` · ${p.subnet}`) : ""]));
+      }
+      say(dim(report.detail));
+    },
+
+    async stun() {
+      const loading = line([acc("·   "), dim("perguntando quais sockets existem…")]);
+      print(loading);
+      const result = await runStun({
+        onGather: (urls) => loading.replaceChildren(acc("·   "), dim(`falando UDP com ${urls.join(" e ")}…`)),
+      });
+      loading.remove();
+      if (result.off) return say(dim("o teste de NAT está desligado neste servidor: falta abrir as portas UDP"));
+      if (result.error) return say(warn("! "), result.error);
+      const { report, candidates } = result;
+      say(dim(`você (HTTP): ${report.you.ip} · mapeamento: ${report.mapping}`));
+      const mark = { contradicao: "✗", exposto: "!", info: "·", ok: "✓" }[report.verdict];
+      say(
+        report.verdict === "ok" || report.verdict === "info"
+          ? bold(`${mark} ${report.headline}`)
+          : warn(`${mark} ${report.headline}`),
+      );
+      for (const s of report.sightings)
+        print(line([acc(`porta ${s.port}`.padEnd(24)), dim(`vista nos sockets ${s.serverPorts.join(", ")}`)]));
+      for (const c of candidates) {
+        const p = candidateParts(c);
+        print(line([acc(p.where.padEnd(24)), dim(`candidato do navegador · ${p.local}`)]));
       }
       say(dim(report.detail));
     },

@@ -553,11 +553,33 @@
             </div>
           </section>
 
-          <section class="block" aria-labelledby="t-curl">
+          <section class="block" aria-labelledby="t-stun">
             <div class="rule" aria-hidden="true"></div>
             <div class="block-head">
               <div class="block-title">
                 <span>06</span>
+                <h2 id="t-stun">Seu NAT</h2>
+              </div>
+              <p>
+                Este servidor também é um servidor STUN: o navegador fala UDP com dois sockets dele, e cada um responde
+                de que endereço e porta a sua rede falou. Dois sockets bastam para ver se o seu NAT guarda a mesma porta
+                para destinos diferentes — que é o que decide se uma chamada ponto a ponto funciona sem relay.
+              </p>
+            </div>
+            <div class="scan-actions">
+              <button type="button" class="btn" id="stun-run">testar meu NAT</button>
+              <span class="muted small mono" id="stun-servers"></span>
+            </div>
+            <div class="cell dns-result" id="stun-result" aria-live="polite">
+              <p class="muted small">Nada roda até você clicar: o teste abre uma conexão WebRTC que dura segundos.</p>
+            </div>
+          </section>
+
+          <section class="block" aria-labelledby="t-curl">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>07</span>
                 <h2 id="t-curl">Sem navegador</h2>
               </div>
               <p>O mesmo scan responde a qualquer cliente HTTP. Rode no seu terminal e veja o que ele entrega.</p>
