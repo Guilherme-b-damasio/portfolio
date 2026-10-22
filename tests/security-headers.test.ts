@@ -4,7 +4,11 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import express from "express";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CONTENT_SECURITY_POLICY, securityHeaders } from "../src/http/middleware/security-headers.js";
+import {
+  CONTENT_SECURITY_POLICY,
+  contentSecurityPolicy,
+  securityHeaders,
+} from "../src/http/middleware/security-headers.js";
 
 const root = path.resolve(import.meta.dirname, "..");
 
@@ -41,6 +45,14 @@ describe("security headers", () => {
     expect(scriptSrc).toBe("script-src 'self'");
     expect(CONTENT_SECURITY_POLICY).not.toMatch(/unsafe-inline|unsafe-eval/);
     expect(CONTENT_SECURITY_POLICY).toContain("frame-ancestors 'none'");
+  });
+
+  it("adds the DNS leak zone to images only, scripts stay on this origin", () => {
+    const policy = contentSecurityPolicy(["https://*.leak.example.test"]);
+    expect(policy).toContain("img-src 'self' data: https://*.leak.example.test;");
+    expect(policy.split("; ").find((d) => d.startsWith("script-src"))).toBe("script-src 'self'");
+    expect(policy.split("; ").find((d) => d.startsWith("connect-src"))).toBe("connect-src 'self'");
+    expect(contentSecurityPolicy()).toBe(CONTENT_SECURITY_POLICY);
   });
 
   it("matches the page: no inline scripts, handlers or style attributes", async () => {

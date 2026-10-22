@@ -27,10 +27,20 @@ const HEADERS: Record<string, string> = {
   "Strict-Transport-Security": "max-age=15552000; includeSubDomains",
 };
 
+/**
+ * The policy with extra image sources. The DNS leak test loads an image from a random name under its
+ * zone: the request itself fails, what counts is that the browser had to resolve the name first.
+ */
+export function contentSecurityPolicy(imgSrc: string[] = []): string {
+  if (!imgSrc.length) return CONTENT_SECURITY_POLICY;
+  return CONTENT_SECURITY_POLICY.replace("img-src 'self' data:", `img-src 'self' data: ${imgSrc.join(" ")}`);
+}
+
 /** Sets the same security headers on every response, API and static files alike. */
-export function securityHeaders(): RequestHandler {
+export function securityHeaders({ imgSrc = [] }: { imgSrc?: string[] } = {}): RequestHandler {
+  const headers = { ...HEADERS, "Content-Security-Policy": contentSecurityPolicy(imgSrc) };
   return (_req, res, next) => {
-    for (const [name, value] of Object.entries(HEADERS)) res.setHeader(name, value);
+    for (const [name, value] of Object.entries(headers)) res.setHeader(name, value);
     next();
   };
 }
