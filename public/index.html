@@ -531,11 +531,33 @@
             <div class="cell hex-box" id="handshake"></div>
           </section>
 
-          <section class="block" aria-labelledby="t-curl">
+          <section class="block" aria-labelledby="t-dns">
             <div class="rule" aria-hidden="true"></div>
             <div class="block-head">
               <div class="block-title">
                 <span>05</span>
+                <h2 id="t-dns">Seu DNS</h2>
+              </div>
+              <p>
+                Antes de abrir qualquer site, alguém traduz o nome para um IP. Este servidor é a autoridade de um
+                subdomínio: a página resolve um nome que nunca existiu e vê qual resolvedor veio perguntar. Numa VPN,
+                ele deveria ser o da VPN.
+              </p>
+            </div>
+            <div class="scan-actions">
+              <button type="button" class="btn" id="dns-run">testar meu DNS</button>
+              <span class="muted small mono" id="dns-name"></span>
+            </div>
+            <div class="cell dns-result" id="dns-result" aria-live="polite">
+              <p class="muted small">Nada roda até você clicar: o teste cria um nome que vale por 5 minutos.</p>
+            </div>
+          </section>
+
+          <section class="block" aria-labelledby="t-curl">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>06</span>
                 <h2 id="t-curl">Sem navegador</h2>
               </div>
               <p>O mesmo scan responde a qualquer cliente HTTP. Rode no seu terminal e veja o que ele entrega.</p>

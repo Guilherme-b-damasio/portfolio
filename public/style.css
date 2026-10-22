@@ -1879,6 +1879,20 @@ textarea.input {
 .signal-list .fact-row dd {
   font-size: 13px;
 }
+.dns-result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+/* Already inside a cell: only the verdict stripe on the left stays. */
+.dns-result .finding {
+  padding: 0 0 0 var(--space-4);
+  border-radius: 0;
+}
+#dns-name {
+  overflow-wrap: anywhere;
+}
 
 /* ---------- /voce: the handshake, byte by byte ---------- */
 .hex-box {
