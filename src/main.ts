@@ -16,6 +16,7 @@ import { SendContact } from "./application/send-contact.js";
 import { ShowEvals } from "./application/show-evals.js";
 import { ShowTrace } from "./application/show-trace.js";
 import { TraceDeploys } from "./application/trace-deploys.js";
+import { ProbeNat } from "./application/probe-nat.js";
 import { TestDnsLeak } from "./application/test-dns-leak.js";
 import { TuneSearch } from "./application/tune-search.js";
 import { createApp } from "./http/app.js";
@@ -45,6 +46,8 @@ import { AlpnServer } from "./infrastructure/http2/alpn-server.js";
 import { Http1Bridge } from "./infrastructure/http2/http1-bridge.js";
 import { TrackedHttp2Connections } from "./infrastructure/http2/tracked-http2-connections.js";
 import { DnsReverseLookup } from "./infrastructure/net/dns-reverse-lookup.js";
+import { InMemoryNatBindings } from "./infrastructure/stun/in-memory-bindings.js";
+import { StunServer } from "./infrastructure/stun/stun-server.js";
 import { FileTlsSamples } from "./infrastructure/tls/file-tls-samples.js";
 import { TlsTap } from "./infrastructure/tls/tls-tap.js";
 import { SampledHistory } from "./infrastructure/metrics/sampled-history.js";
@@ -146,6 +149,26 @@ const dnsServer =
         { maxQueriesPerSecond: Number(process.env.DNS_MAX_QPS ?? 200) },
       )
     : null;
+// The STUN test needs UDP reaching these ports from outside; without STUN_PORTS it stays off and
+// /api/stun says so. Two sockets, because the pair is what shows how the visitor's NAT maps a port:
+// the same one for both destinations, or a new one each time.
+const stunPorts = ports(process.env.STUN_PORTS);
+// What the browser is told to aim at: the Service may publish other ports than the ones bound here,
+// and another hostname than this page's. Without a host the page uses its own.
+const stunPublicPorts = ports(process.env.STUN_PUBLIC_PORTS).length ? ports(process.env.STUN_PUBLIC_PORTS) : stunPorts;
+const stunHost = process.env.STUN_PUBLIC_HOST || null;
+const natBindings = stunPorts.length ? new InMemoryNatBindings() : null;
+const stunServers = natBindings
+  ? stunPorts.map(() => new StunServer(natBindings, { maxRequestsPerSecond: Number(process.env.STUN_MAX_RPS ?? 200) }))
+  : [];
+
+function ports(list: string | undefined): number[] {
+  return (list ?? "")
+    .split(",")
+    .map((p) => Number(p.trim()))
+    .filter((p) => Number.isInteger(p) && p > 0 && p < 65_536);
+}
+
 const tap = certFile && keyFile ? new TlsTap({ proxyProtocol: process.env.TLS_PROXY_PROTOCOL === "1" }) : null;
 // What each h2 connection opened with, filled by the TLS front below and read by the scan.
 const http2Connections = tap ? new TrackedHttp2Connections() : null;
@@ -187,6 +210,12 @@ const app = createApp({
     ].map(([name, path]) => new LoopbackTarget(name, path, `http://127.0.0.1:${port}`)),
   ),
   testDnsLeak: leakProbes ? new TestDnsLeak(leakProbes, new DnsReverseLookup()) : null,
+  probeNat: natBindings
+    ? new ProbeNat(
+        natBindings,
+        stunPublicPorts.map((port) => ({ host: stunHost, port })),
+      )
+    : null,
   dnsLeakZone,
   publicDir: path.join(root, "public"),
   // Questions per visitor: a bucket this size that refills at the same rate per minute.
@@ -230,6 +259,20 @@ if (tap && http2Connections && certFile && keyFile) {
   }, 6 * 3_600_000).unref();
 }
 
+if (natBindings) {
+  // Unprivileged ports in the pod; the Service maps the published ones onto them.
+  const bound = [];
+  for (const [i, server] of stunServers.entries()) bound.push(await server.listen(stunPorts[i]));
+  // Each socket points at the next one as OTHER-ADDRESS, so a client can walk the pair itself.
+  const stunAddress = process.env.STUN_PUBLIC_ADDRESS || null;
+  if (stunAddress)
+    stunServers.forEach((server, i) => {
+      server.advertise = { address: stunAddress, port: stunPublicPorts[i] };
+      server.other = { address: stunAddress, port: stunPublicPorts[(i + 1) % stunPublicPorts.length] };
+    });
+  logger.info("listening", { stun: bound.join(","), advertised: stunPublicPorts.join(",") });
+}
+
 if (dnsServer && dnsLeakZone) {
   // Unprivileged port in the pod; the Service maps 53/udp onto it.
   const dnsPort = await dnsServer.listen(Number(process.env.DNS_PORT ?? 8053));
@@ -242,6 +285,7 @@ for (const signal of ["SIGTERM", "SIGINT"] as const) {
     stopSampling();
     tlsServer?.close();
     void dnsServer?.close();
+    for (const server of stunServers) void server.close();
     server.close(() => process.exit(0));
   });
 }

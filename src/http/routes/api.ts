@@ -12,6 +12,7 @@ import type { SendContact } from "../../application/send-contact.js";
 import type { ShowEvals } from "../../application/show-evals.js";
 import type { ShowTrace } from "../../application/show-trace.js";
 import type { TraceDeploys } from "../../application/trace-deploys.js";
+import type { ProbeNat } from "../../application/probe-nat.js";
 import type { TestDnsLeak } from "../../application/test-dns-leak.js";
 import type { TuneSearch } from "../../application/tune-search.js";
 import type { Http2Connections } from "../../domain/http2.js";
@@ -28,6 +29,7 @@ import { labRouter } from "./lab.js";
 import { loadLabRouter } from "./load-lab.js";
 import { scanRouter } from "./scan.js";
 import { searchLabRouter } from "./search-lab.js";
+import { stunRouter } from "./stun.js";
 
 export interface ApiDeps {
   browse: BrowsePortfolio;
@@ -48,6 +50,7 @@ export interface ApiDeps {
   tuneSearch?: TuneSearch | null; // the search playground at /api/lab/search; off without a tunable index
   loadLab?: LoadLab | null; // the load lab at /api/lab/load; one run at a time across every visitor
   testDnsLeak?: TestDnsLeak | null; // /api/dns-leak; off without a delegated zone
+  probeNat?: ProbeNat | null; // /api/stun; off without the STUN sockets listening
 }
 
 // A follow-up carries the last turns from the browser. Capped here so a visitor cannot inflate the prompt.
@@ -98,6 +101,7 @@ export function apiRouter(
     tuneSearch,
     loadLab,
     testDnsLeak,
+    probeNat,
   }: ApiDeps,
   logger: Logger,
   { bucket: askBucket, gate: askGate }: AskGuards,
@@ -244,6 +248,7 @@ export function apiRouter(
   api.use("/lab", labRouter());
   if (showEvals) api.use("/evals", evalsRouter(showEvals));
   api.use("/dns-leak", dnsLeakRouter(testDnsLeak ?? null));
+  api.use("/stun", stunRouter(probeNat ?? null));
   api.use("/scan", scanRouter(inspectVisitor, tapped ?? null, tlsSamples ?? null, http2 ?? null));
 
   return api;

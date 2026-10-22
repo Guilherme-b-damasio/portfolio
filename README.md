@@ -39,6 +39,10 @@ Portuguese stemmer (`src/infrastructure/search/portuguese-stemmer.ts`), so "trab
 | `DNS_LEAK_NS`, `DNS_LEAK_NS_ADDRESS` | `ns.$DNS_LEAK_ZONE`, unset | The nameserver name the parent zone delegates to, and its IPv4 for resolvers that ask |
 | `DNS_LEAK_ANSWER_A`, `DNS_LEAK_ANSWER_AAAA` | unset | What probe names resolve to; unset answers NODATA, which is enough for the test |
 | `DNS_MAX_QPS` | `200` | Queries answered per second across every resolver; the rest are dropped |
+| `STUN_PORTS` | unset | UDP ports for the STUN server of the NAT test (e.g. `3478,3479`); two of them turn on `/api/stun` |
+| `STUN_PUBLIC_PORTS`, `STUN_PUBLIC_HOST` | `$STUN_PORTS`, unset | What the browser is told to aim at, when the Service publishes other ports or another host than this page's |
+| `STUN_PUBLIC_ADDRESS` | unset | The address clients reach, sent back as `RESPONSE-ORIGIN`/`OTHER-ADDRESS`; unset, neither is sent |
+| `STUN_MAX_RPS` | `200` | Binding requests answered per second across every client; the rest are dropped |
 | `TLS_PROXY_PROTOCOL` | unset | `1` when that port sits behind a TCP passthrough that sends the PROXY protocol; the header then becomes mandatory |
 | `ASK_RATE_PER_MINUTE` | `5`             | Questions per visitor: a bucket of this size that refills at this rate per minute (HTTP and MCP share it) |
 | `ASK_MAX_CONCURRENCY` | `4`             | Questions answered at once across every visitor (HTTP and MCP); above it, 503 with `Retry-After` |
@@ -208,6 +212,31 @@ DNS_LEAK_ZONE=leak.localhost npm run dev
 TOKEN=$(curl -s -X POST localhost:3000/api/dns-leak | jq -r .token)
 dig @127.0.0.1 -p 8053 +subnet=200.150.1.0/24 $TOKEN.leak.localhost
 curl -s localhost:3000/api/dns-leak/$TOKEN | jq '.headline, .resolvers'
+```
+
+### STUN and NAT
+
+The app is also its own STUN server (RFC 8489 on `node:dgram`, `src/infrastructure/stun/`), so the
+WebRTC part of the x-ray does not have to borrow Google's. Two sockets listen (`STUN_PORTS`), the
+browser gathers ICE candidates against both, and `GET /api/stun` reports what they saw coming from
+the address this page came over: the reflexive port, and whether both sockets saw the same one.
+The same port for two destinations is an endpoint-independent mapping, which is what lets two
+browsers talk without a relay; a different port each time is the symmetric NAT, where a hole
+punched with us is useless to a peer. `POST /api/stun` adds the address the browser says it was
+given: it is only compared with the address of this page, never looked up, because asking about an
+address is asking about whoever is behind it. When the two disagree and nothing reached us from the
+page's address, the UDP is leaving by another path than the page, which is what a VPN that does not
+carry UDP looks like.
+
+The server answers Binding requests and nothing else: it stays silent on anything that is not one
+(the port is a reflection vector otherwise), answers with little more than it was asked, drops
+everything past `STUN_MAX_RPS`, and keeps each address's sightings in memory for two minutes, at
+most 2 000 addresses. In the cluster this needs UDP reaching the pod: see `k8s/stun.example.yaml`.
+To try it locally:
+
+```bash
+STUN_PORTS=3478,3479 npm run dev
+curl -s localhost:3000/api/stun | jq '.servers, .headline'
 ```
 
 ## MCP
