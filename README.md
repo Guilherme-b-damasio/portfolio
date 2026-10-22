@@ -197,7 +197,11 @@ shows through the DNS, and the report calls it a contradiction.
 
 The server only records names it handed out (at most 2 000 at once, for 5 minutes), answers no
 more than `DNS_MAX_QPS` queries per second, refuses names outside its zone and never answers
-with more than it was asked, so it cannot be used to amplify traffic. To try it locally:
+with more than it was asked, so it cannot be used to amplify traffic. On `/voce` the "Seu DNS"
+section (and `dnsleak` in the terminal) runs the test on demand: the probe name is loaded as an
+image under the zone, which the CSP allows for images only, and the request is meant to fail.
+In the cluster this needs the zone delegated and 53/udp reaching the pod: see
+`k8s/dns-leak.example.yaml`. To try it locally:
 
 ```bash
 DNS_LEAK_ZONE=leak.localhost npm run dev
