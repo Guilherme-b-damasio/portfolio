@@ -7,7 +7,7 @@ import type {
   StunSighting,
   StunView,
 } from "../domain/stun.js";
-import { plainIp } from "./scan/ip.js";
+import { ipVersion, plainIp } from "./scan/ip.js";
 
 /**
  * The NAT probe: the browser gathers ICE candidates against this server's own STUN sockets, and
@@ -84,12 +84,21 @@ function judge(
   elsewhere: ClaimedAddress[],
   ip: string,
 ): Pick<NatReport, "verdict" | "headline" | "detail"> {
-  if (!views.length && elsewhere.length)
+  // Another family is the everyday dual-stack case, not a leak: these sockets only speak IPv4,
+  // so a page served over IPv6 is answered from the visitor's IPv4 and the two never match.
+  const sameFamily = elsewhere.filter((c) => ipVersion(c.address) === ipVersion(ip));
+  if (!views.length && sameFamily.length)
     return {
       verdict: "contradicao",
-      headline: `o navegador foi atendido em ${elsewhere[0].address}, não em ${ip}`,
+      headline: `o navegador foi atendido em ${sameFamily[0].address}, não em ${ip}`,
       detail:
         "Esta página chegou por um endereço e o UDP saiu por outro, e nada chegou aqui vindo do primeiro. Numa VPN, é o tráfego UDP escapando por fora dela; também acontece com CGNAT e com redes que tratam TCP e UDP por caminhos diferentes.",
+    };
+  if (!views.length && elsewhere.length)
+    return {
+      verdict: "info",
+      headline: `você veio por IPv${ipVersion(ip)} e o UDP saiu por IPv${ipVersion(elsewhere[0].address)}`,
+      detail: `Esta página chegou de ${ip} e o STUN atendeu ${elsewhere[0].address}: é a sua pilha dupla escolhendo caminhos diferentes para TCP e UDP, não um vazamento. Estes sockets só falam IPv4.`,
     };
   if (!views.length)
     return {

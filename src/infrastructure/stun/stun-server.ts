@@ -31,6 +31,12 @@ export class StunServer {
   private window = { second: 0, count: 0 };
   private socket: Socket | null = null;
   private origin: TransportAddress | null = null;
+  /**
+   * What to put in RESPONSE-ORIGIN: inside a pod the socket is bound to 0.0.0.0 and the address
+   * clients reach is the Service's, which only the composition root knows. Unset, neither it nor
+   * OTHER-ADDRESS is sent, and the client still has the source address of the datagram.
+   */
+  advertise: TransportAddress | null = null;
   /** The other socket of this pair, advertised as OTHER-ADDRESS (RFC 5780) once both are listening. */
   other: TransportAddress | null = null;
   readonly stats = { answered: 0, dropped: 0, ignored: 0 };
@@ -108,12 +114,13 @@ export class StunServer {
       software: software ? software.toString("utf8").slice(0, 64) : null,
     });
     this.stats.answered++;
+    const self = this.advertise ?? origin;
     return writeMessage({
       class: CLASS.SUCCESS,
       transactionId,
       attributes: [
         attr.xorMappedAddress(from, transactionId),
-        ...(origin ? [attr.responseOrigin(origin)] : []),
+        ...(self && !unspecified(self.address) ? [attr.responseOrigin(self)] : []),
         ...(this.other ? [attr.otherAddress(this.other)] : []),
         ...(this.software ? [attr.software(this.software)] : []),
       ],
@@ -131,4 +138,9 @@ export class StunServer {
     if (second !== this.window.second) this.window = { second, count: 0 };
     return ++this.window.count <= this.maxRequestsPerSecond;
   }
+}
+
+/** "0.0.0.0" and "::": what a socket is bound to when it listens everywhere, no use to a client. */
+function unspecified(address: string): boolean {
+  return address === "0.0.0.0" || address === "::";
 }

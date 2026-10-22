@@ -76,6 +76,12 @@ describe("probe nat", () => {
     expect(report.browser).toEqual([{ address: "198.51.100.7", port: 40000 }]);
   });
 
+  it("calls another family dual stack, not a leak: these sockets only speak IPv4", () => {
+    const report = new ProbeNat(bindings({}), SERVERS).report("2001:db8::1", [{ address: "203.0.113.9", port: 40000 }]);
+    expect(report.verdict).toBe("info");
+    expect(report.headline).toMatch(/IPv6 e o UDP saiu por IPv4/);
+  });
+
   it("does not call it a leak when the browser reports the same address this page came over", () => {
     const store = bindings({});
     const report = new ProbeNat(store, SERVERS).report("203.0.113.9", [{ address: "203.0.113.9", port: 40000 }]);
