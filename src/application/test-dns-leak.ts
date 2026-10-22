@@ -16,6 +16,8 @@ const PUBLIC_RESOLVERS: { operator: string; ptr: RegExp; ranges: [string, number
     operator: "Google",
     ptr: /(^|\.)(dns\.google|1e100\.net)$/,
     ranges: [
+      ["8.8.8.0", 24],
+      ["8.8.4.0", 24],
       ["172.253.0.0", 16],
       ["74.125.0.0", 16],
       ["2404:6800::", 32],
@@ -28,13 +30,22 @@ const PUBLIC_RESOLVERS: { operator: string; ptr: RegExp; ranges: [string, number
     operator: "Cloudflare",
     ptr: /(^|\.)(one\.one\.one\.one|cloudflare-dns\.com|cloudflare\.com)$/,
     ranges: [
+      ["1.1.1.0", 24],
+      ["1.0.0.0", 24],
       ["162.158.0.0", 15],
       ["172.64.0.0", 13],
       ["2400:cb00::", 32],
       ["2a06:98c0::", 29],
     ],
   },
-  { operator: "Quad9", ptr: /(^|\.)quad9\.net$/, ranges: [] },
+  {
+    operator: "Quad9",
+    ptr: /(^|\.)quad9\.net$/,
+    ranges: [
+      ["9.9.9.0", 24],
+      ["149.112.112.0", 24],
+    ],
+  },
   {
     operator: "OpenDNS (Cisco)",
     ptr: /(^|\.)(opendns\.com|umbrella\.com)$/,
