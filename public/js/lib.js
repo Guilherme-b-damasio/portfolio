@@ -83,7 +83,9 @@ export function hourStrip(points, now = Date.now()) {
 /** Groups a request the way the server's metrics do, e.g. GET /api/projects/:slug. */
 export function routeLabel(method, path) {
   const clean = path.split("?")[0];
-  const normalized = clean.replace(/^\/api\/projects\/[^/]+$/, "/api/projects/:slug");
+  const normalized = clean
+    .replace(/^\/api\/projects\/[^/]+$/, "/api/projects/:slug")
+    .replace(/^\/api\/dns-leak\/[^/]+$/, "/api/dns-leak/:token");
   return `${method} ${normalized}`;
 }
 
@@ -260,6 +262,29 @@ export function scanHeadline({ summary }) {
   if (exposures)
     return `Nada falsificado, mas ${exposures} ${exposures === 1 ? "coisa exposta" : "coisas expostas"} que dá para esconder.`;
   return "Nada contraditório e nada exposto que dê para esconder. Raro.";
+}
+
+export const RESOLVER_RELATIONS = {
+  "mesma-rede": "da sua rede",
+  publico: "público",
+  "outra-rede": "de outra rede",
+};
+
+/** The pieces of one resolver of the DNS leak report: who it is, how it relates to you, what it forwarded. */
+export function resolverParts(r) {
+  const who = [r.address, r.reverseDns].filter(Boolean).join(" · ");
+  const relation = r.operator
+    ? `${r.operator} (${RESOLVER_RELATIONS.publico})`
+    : (RESOLVER_RELATIONS[r.relation] ?? r.relation);
+  const subnet = r.clientSubnet
+    ? `repassou ${r.clientSubnet.address}/${r.clientSubnet.prefix}${r.subnetHasYou === false ? ", que não é a sua rede" : ""}`
+    : null;
+  return { who, relation, subnet, qtypes: r.qtypes.join(", ") };
+}
+
+/** The image URL that makes the browser resolve a probe name; the request itself is meant to fail. */
+export function leakProbeUrl(hostname, now = Date.now()) {
+  return `https://${hostname}/p.gif?${now}`;
 }
 
 /** For each byte of the dump, the index of the field it belongs to (or -1), from the server's annotations. */
