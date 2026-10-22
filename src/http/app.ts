@@ -17,15 +17,16 @@ export interface AppDeps extends ApiDeps {
   logger: Logger;
   publicDir: string;
   traces?: TraceStore | null; // without one, requests are not traced
+  dnsLeakZone?: string | null; // the DNS leak test loads images from names under it
 }
 
-export function createApp({ metrics, logger, publicDir, traces, ...apiDeps }: AppDeps) {
+export function createApp({ metrics, logger, publicDir, traces, dnsLeakZone, ...apiDeps }: AppDeps) {
   const app = express();
   app.set("trust proxy", 1); // behind Traefik in k3s, so req.ip is the real client
   app.disable("x-powered-by");
   app.use(proxiedClient(apiDeps.tapped));
   app.use(requestId());
-  app.use(securityHeaders());
+  app.use(securityHeaders({ imgSrc: dnsLeakZone ? [`https://*.${dnsLeakZone}`] : [] }));
   app.use(accessLog(logger));
   app.use(recordMetrics(metrics));
   if (traces) app.use(tracing(traces));

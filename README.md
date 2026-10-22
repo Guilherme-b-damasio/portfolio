@@ -35,6 +35,10 @@ Portuguese stemmer (`src/infrastructure/search/portuguese-stemmer.ts`), so "trab
 | `CLAUDE_MODEL`      | `claude-opus-5-5` | Model used by `/api/ask`                             |
 | `LLM_DAILY_TOKEN_BUDGET` | `200000`    | LLM tokens (input + output) per UTC day; past it `/api/ask` returns only the passages, with `degraded: "token-budget"`, until 00:00 UTC |
 | `TLS_CERT_FILE`, `TLS_KEY_FILE` | unset | Also serve HTTPS on `TLS_PORT` (default `8443`, h2 and HTTP/1.1) and fingerprint each visitor's TLS handshake and HTTP/2 preface. Re-read every 6 h |
+| `DNS_LEAK_ZONE` | unset | Zone delegated to this app for the DNS leak test (e.g. `leak.example.com`); turns on the UDP server on `DNS_PORT` (default `8053`) and `/api/dns-leak` |
+| `DNS_LEAK_NS`, `DNS_LEAK_NS_ADDRESS` | `ns.$DNS_LEAK_ZONE`, unset | The nameserver name the parent zone delegates to, and its IPv4 for resolvers that ask |
+| `DNS_LEAK_ANSWER_A`, `DNS_LEAK_ANSWER_AAAA` | unset | What probe names resolve to; unset answers NODATA, which is enough for the test |
+| `DNS_MAX_QPS` | `200` | Queries answered per second across every resolver; the rest are dropped |
 | `TLS_PROXY_PROTOCOL` | unset | `1` when that port sits behind a TCP passthrough that sends the PROXY protocol; the header then becomes mandatory |
 | `ASK_RATE_PER_MINUTE` | `5`             | Questions per visitor: a bucket of this size that refills at this rate per minute (HTTP and MCP share it) |
 | `ASK_MAX_CONCURRENCY` | `4`             | Questions answered at once across every visitor (HTTP and MCP); above it, 503 with `Retry-After` |
@@ -178,6 +182,28 @@ mkdir -p .certs && printf '[req]\ndistinguished_name=dn\n[dn]\n' > .certs/req.cn
 openssl req -x509 -config .certs/req.cnf -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 7 -subj /CN=localhost -keyout .certs/key.pem -out .certs/cert.pem
 TLS_CERT_FILE=.certs/cert.pem TLS_KEY_FILE=.certs/key.pem npm run dev
 curl -sk -A "Mozilla/5.0 Chrome/152.0.0.0" https://localhost:8443/api/scan | jq '.findings[0].title'
+```
+
+### DNS leak test
+
+The app can be the authoritative server for a small zone (`DNS_LEAK_ZONE`), written on
+`node:dgram` in `src/infrastructure/dns/`. `POST /api/dns-leak` hands out a random name under it;
+the page makes the browser resolve that name, and the query that reaches the zone comes from
+whichever resolver the visitor's system really uses. `GET /api/dns-leak/:token` then says who
+asked: the visitor's own network, a known public resolver (Google, Cloudflare, Quad9...) or
+another network, which is what a VPN that lets DNS escape looks like. When the resolver forwards
+an EDNS Client Subnet that does not contain the address the page came from, the real network
+shows through the DNS, and the report calls it a contradiction.
+
+The server only records names it handed out (at most 2 000 at once, for 5 minutes), answers no
+more than `DNS_MAX_QPS` queries per second, refuses names outside its zone and never answers
+with more than it was asked, so it cannot be used to amplify traffic. To try it locally:
+
+```bash
+DNS_LEAK_ZONE=leak.localhost npm run dev
+TOKEN=$(curl -s -X POST localhost:3000/api/dns-leak | jq -r .token)
+dig @127.0.0.1 -p 8053 +subnet=200.150.1.0/24 $TOKEN.leak.localhost
+curl -s localhost:3000/api/dns-leak/$TOKEN | jq '.headline, .resolvers'
 ```
 
 ## MCP

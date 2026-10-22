@@ -16,6 +16,7 @@ import { SendContact } from "./application/send-contact.js";
 import { ShowEvals } from "./application/show-evals.js";
 import { ShowTrace } from "./application/show-trace.js";
 import { TraceDeploys } from "./application/trace-deploys.js";
+import { TestDnsLeak } from "./application/test-dns-leak.js";
 import { TuneSearch } from "./application/tune-search.js";
 import { createApp } from "./http/app.js";
 import { MAX_TURNS } from "./http/routes/api.js";
@@ -29,6 +30,9 @@ import { KubernetesRolloutHistory } from "./infrastructure/cluster/kubernetes-ro
 import { CachedBuildHistory } from "./infrastructure/delivery/cached-build-history.js";
 import { GitHubBuildHistory, gitHubGet } from "./infrastructure/delivery/github-build-history.js";
 import { MarkdownContentSource } from "./infrastructure/content/markdown-content-source.js";
+import { AuthoritativeDnsServer } from "./infrastructure/dns/authoritative-dns-server.js";
+import { InMemoryLeakProbes } from "./infrastructure/dns/in-memory-leak-probes.js";
+import { LeakZone } from "./infrastructure/dns/leak-zone.js";
 import { loadEvalSet } from "./infrastructure/evals/json-eval-set.js";
 import { LoopbackTarget } from "./infrastructure/load/loopback-target.js";
 import { JsonLogger } from "./infrastructure/logging/json-logger.js";
@@ -125,6 +129,23 @@ const tagSelections =
         }),
       )
     : null;
+// The DNS leak test needs a zone delegated to this pod (an NS record in the parent zone) and UDP
+// reaching DNS_PORT; without DNS_LEAK_ZONE it stays off and /api/dns-leak says so.
+const dnsLeakZone = process.env.DNS_LEAK_ZONE?.replace(/\.$/, "").toLowerCase() || null;
+const leakProbes = dnsLeakZone ? new InMemoryLeakProbes(dnsLeakZone) : null;
+const dnsServer =
+  dnsLeakZone && leakProbes
+    ? new AuthoritativeDnsServer(
+        new LeakZone(leakProbes, {
+          zone: dnsLeakZone,
+          nameserver: process.env.DNS_LEAK_NS ?? `ns.${dnsLeakZone}`,
+          nameserverAddress: process.env.DNS_LEAK_NS_ADDRESS ?? null,
+          answerV4: process.env.DNS_LEAK_ANSWER_A ?? null,
+          answerV6: process.env.DNS_LEAK_ANSWER_AAAA ?? null,
+        }),
+        { maxQueriesPerSecond: Number(process.env.DNS_MAX_QPS ?? 200) },
+      )
+    : null;
 const tap = certFile && keyFile ? new TlsTap({ proxyProtocol: process.env.TLS_PROXY_PROTOCOL === "1" }) : null;
 // What each h2 connection opened with, filled by the TLS front below and read by the scan.
 const http2Connections = tap ? new TrackedHttp2Connections() : null;
@@ -165,6 +186,8 @@ const app = createApp({
       ["status", "/api/status"],
     ].map(([name, path]) => new LoopbackTarget(name, path, `http://127.0.0.1:${port}`)),
   ),
+  testDnsLeak: leakProbes ? new TestDnsLeak(leakProbes, new DnsReverseLookup()) : null,
+  dnsLeakZone,
   publicDir: path.join(root, "public"),
   // Questions per visitor: a bucket this size that refills at the same rate per minute.
   askLimit: { capacity: askRate, refillPerMinute: askRate },
@@ -207,11 +230,18 @@ if (tap && http2Connections && certFile && keyFile) {
   }, 6 * 3_600_000).unref();
 }
 
+if (dnsServer && dnsLeakZone) {
+  // Unprivileged port in the pod; the Service maps 53/udp onto it.
+  const dnsPort = await dnsServer.listen(Number(process.env.DNS_PORT ?? 8053));
+  logger.info("listening", { port: dnsPort, dns: dnsLeakZone });
+}
+
 // k8s sends SIGTERM on rollout; finish in-flight requests before exiting.
 for (const signal of ["SIGTERM", "SIGINT"] as const) {
   process.on(signal, () => {
     stopSampling();
     tlsServer?.close();
+    void dnsServer?.close();
     server.close(() => process.exit(0));
   });
 }

@@ -12,6 +12,7 @@ import type { SendContact } from "../../application/send-contact.js";
 import type { ShowEvals } from "../../application/show-evals.js";
 import type { ShowTrace } from "../../application/show-trace.js";
 import type { TraceDeploys } from "../../application/trace-deploys.js";
+import type { TestDnsLeak } from "../../application/test-dns-leak.js";
 import type { TuneSearch } from "../../application/tune-search.js";
 import type { Http2Connections } from "../../domain/http2.js";
 import type { Logger } from "../../domain/logger.js";
@@ -21,6 +22,7 @@ import { rateLimit, TokenBucket } from "../middleware/rate-limit.js";
 import { openEventStream } from "../sse.js";
 import { clusterRouter } from "./cluster.js";
 import { contactRouter } from "./contact.js";
+import { dnsLeakRouter } from "./dns-leak.js";
 import { evalsRouter } from "./evals.js";
 import { labRouter } from "./lab.js";
 import { loadLabRouter } from "./load-lab.js";
@@ -45,6 +47,7 @@ export interface ApiDeps {
   traceDeploys?: TraceDeploys | null; // /api/deploys; both of its sources are cached upstream
   tuneSearch?: TuneSearch | null; // the search playground at /api/lab/search; off without a tunable index
   loadLab?: LoadLab | null; // the load lab at /api/lab/load; one run at a time across every visitor
+  testDnsLeak?: TestDnsLeak | null; // /api/dns-leak; off without a delegated zone
 }
 
 // A follow-up carries the last turns from the browser. Capped here so a visitor cannot inflate the prompt.
@@ -94,6 +97,7 @@ export function apiRouter(
     traceDeploys,
     tuneSearch,
     loadLab,
+    testDnsLeak,
   }: ApiDeps,
   logger: Logger,
   { bucket: askBucket, gate: askGate }: AskGuards,
@@ -239,6 +243,7 @@ export function apiRouter(
   if (loadLab) api.use("/lab/load", loadLabRouter(loadLab, logger));
   api.use("/lab", labRouter());
   if (showEvals) api.use("/evals", evalsRouter(showEvals));
+  api.use("/dns-leak", dnsLeakRouter(testDnsLeak ?? null));
   api.use("/scan", scanRouter(inspectVisitor, tapped ?? null, tlsSamples ?? null, http2 ?? null));
 
   return api;
