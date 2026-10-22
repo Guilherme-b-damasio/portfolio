@@ -24,28 +24,41 @@ export interface NatBindings {
 
 /**
  * How the NAT builds the mapping, as far as one server with two ports can tell:
- * - `sem-nat`: the reflexive port is the one the browser used, so nothing is translating.
  * - `porta-fixa`: both of our ports saw the same reflexive port (endpoint-independent mapping),
  *   which is what makes peer-to-peer work without a relay.
  * - `porta-por-destino`: each of our ports saw a different one (address/port-dependent mapping,
- *   the "symmetric" NAT), so holes punched with us are useless to a peer and a TURN relay is needed.
+ *   the "symmetric" NAT), so a hole punched with us is useless to a peer and a TURN relay is needed.
+ * - `desconhecido`: only one of the two sockets was reached, so there is nothing to compare.
  */
-export type NatMapping = "sem-nat" | "porta-fixa" | "porta-por-destino" | "desconhecido";
+export type NatMapping = "porta-fixa" | "porta-por-destino" | "desconhecido";
 
+/** One reflexive port of the visitor, and which of our sockets saw it. */
 export interface StunView {
-  address: string;
-  ports: number[]; // the reflexive ports, one per socket of ours that was reached
+  port: number;
   serverPorts: number[];
   software: string | null;
   at: string;
 }
 
+/** A socket of ours the browser can aim at: the host is null when it is this same page's. */
+export interface StunEndpoint {
+  host: string | null;
+  port: number;
+}
+
+/** A reflexive address the browser says it was given, which this server does not take on faith. */
+export interface ClaimedAddress {
+  address: string;
+  port: number;
+}
+
 export interface NatReport {
-  you: { ip: string }; // the address the page itself came from
-  servers: { port: number }[]; // the sockets the browser can aim at
-  sightings: StunView[];
+  you: { ip: string }; // the address this page came over
+  servers: StunEndpoint[];
+  sightings: StunView[]; // what our sockets saw coming from that same address
+  browser: ClaimedAddress[]; // what the browser says our sockets answered it
   mapping: NatMapping;
-  matchesHttp: boolean | null; // did the UDP address match the one this page came over? null without sightings
+  matchesHttp: boolean | null; // the UDP left by the address this page came over? null with nothing to tell
   pending: boolean; // nothing arrived yet: WebRTC may be blocked, or the port may not be open
   verdict: Verdict;
   headline: string;
