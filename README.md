@@ -152,6 +152,25 @@ layers disagree (a spoofed User-Agent, a half-spoofed time zone, automation), `e
 something could be hidden, `info` or `ok`. The report is computed per request and answered:
 no scan, IP or fingerprint is stored or logged, and the reverse DNS lookup has an 800 ms deadline.
 
+### Whose network the IP is (Tor and datacenters)
+
+The address alone already says which network is carrying the visitor, and the publishers hand that
+out themselves: the Tor project lists its exit nodes, and AWS, Google Cloud and Azure announce the
+blocks they rent. Each list is one `IpRangeFeed` adapter in `src/infrastructure/net/`; `FeedIpIntel`
+loads them at most once every `IP_INTEL_REFRESH_HOURS` (12 by default), files every block under the
+first byte of its network in an `IpRangeIndex`, and answers a lookup from memory with the most
+specific block, the way a routing table would. Each download has a timeout and a hard byte ceiling,
+a feed that fails leaves the others standing, and the first visitor never waits more than 1.5 s:
+past that the scan comes back without this layer while the load finishes for the next one.
+
+The lookups keep the lists small on purpose: AWS's `AMAZON` service and Azure's `AzureCloud` tags
+are the unions of everything those clouds use, so a few thousand blocks cover the same addresses as
+the tens of thousands in the full files. Only public addresses are looked up, nothing is asked of a
+third party, and "no list claims this address" is answered apart from "no list could be read", so
+the scan never calls an address residential when it simply did not look. `IP_INTEL=off` drops the
+layer; Azure's Service Tags file is published under a URL carrying the week's date, so that feed
+waits for `AZURE_SERVICE_TAGS_URL`.
+
 ### TLS fingerprint (JA4)
 
 Behind a TLS-terminating proxy the app never sees the handshake. With `TLS_CERT_FILE` and
