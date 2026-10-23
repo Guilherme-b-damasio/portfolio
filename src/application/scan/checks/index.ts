@@ -10,12 +10,13 @@ import {
 } from "./browser.js";
 import { Http2StackCheck } from "./http2.js";
 import { ClientHintsCheck, LanguageCheck, PrivacySignalCheck, ToolClientCheck } from "./http.js";
-import { ReverseDnsCheck, WebRtcLeakCheck } from "./network.js";
+import { IpOriginCheck, ReverseDnsCheck, WebRtcLeakCheck } from "./network.js";
 import { TlsStackCheck, TlsStrengthCheck } from "./tls.js";
 
 /** Every rule the scan runs, outermost layer first. A new rule is one more line here. */
 export function scanChecks(): ExposureCheck[] {
   return [
+    new IpOriginCheck(),
     new ReverseDnsCheck(),
     new WebRtcLeakCheck(),
     new TlsStackCheck(),

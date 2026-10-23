@@ -67,6 +67,65 @@ export class WebRtcLeakCheck implements ExposureCheck {
   }
 }
 
+/**
+ * Whose network the address belongs to, from the published lists (AWS, Google Cloud, Azure and the
+ * Tor exits). A datacenter block says the visitor is behind a VPN, a proxy or a machine, which is
+ * why those addresses meet a captcha on half the web; a Tor exit is shared by so many people that
+ * the address stops saying anything about this one. Nothing is asked of a third party: the lists
+ * are public files this server already keeps in memory.
+ */
+export class IpOriginCheck implements ExposureCheck {
+  readonly id = "ip-origin";
+
+  run({ ipLookup, observation }: ScanContext): Finding[] {
+    // No list in hand: the scan says nothing rather than guessing the address is residential.
+    if (!ipLookup?.updatedAt) return [];
+    const ip = plainIp(observation.ip);
+    const loaded = `listas carregadas em ${ipLookup.updatedAt}`;
+    const origin = ipLookup.origin;
+
+    if (!origin) {
+      return [
+        {
+          id: `${this.id}-comum`,
+          layer: "rede",
+          verdict: "info",
+          title: "Seu IP é de acesso comum, não de datacenter",
+          detail:
+            "Ele não está nas faixas da AWS, do Google Cloud ou da Azure, nem entre as saídas do Tor. Para quem recebe a requisição isso é sinal de gente de verdade: nenhum atrito, e também nenhum disfarce — o IP é o da sua casa ou do seu celular.",
+          evidence: [`IP ${ip}: fora das listas`, loaded],
+        },
+      ];
+    }
+
+    const where = `${origin.owner}${origin.detail ? ` · ${origin.detail}` : ""}`;
+    if (origin.kind === "tor") {
+      return [
+        {
+          id: `${this.id}-tor`,
+          layer: "rede",
+          verdict: "info",
+          title: "Você chegou pela saída de um nó Tor",
+          detail:
+            "Este endereço é a saída de um relay do Tor, usada por muita gente ao mesmo tempo, então ele não aponta para você. O preço é o atrito: muitos sites bloqueiam ou enchem de captcha o que vem daqui.",
+          evidence: [`IP ${ip} no bloco ${origin.block} (${where})`, `lista: ${origin.feed}`, loaded],
+        },
+      ];
+    }
+    return [
+      {
+        id: `${this.id}-datacenter`,
+        layer: "rede",
+        verdict: "info",
+        title: `Seu IP é de datacenter (${origin.owner})`,
+        detail:
+          "Ninguém mora num datacenter: este endereço é de VPN, proxy ou de uma máquina rodando sozinha. Ele esconde o seu provedor e a sua região, e em troca te coloca na mesma fila dos robôs — captcha, cadastro recusado, limite mais apertado.",
+        evidence: [`IP ${ip} no bloco ${origin.block} (${where})`, `lista: ${origin.feed}`, loaded],
+      },
+    ];
+  }
+}
+
 /** A PTR record turns an IP into a name, which often spells out the ISP, the connection type and sometimes the city. */
 export class ReverseDnsCheck implements ExposureCheck {
   readonly id = "reverse-dns";

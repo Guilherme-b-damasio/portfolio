@@ -40,6 +40,7 @@ function ctx(ua: string, tls: TlsFingerprint | null): ScanContext {
     probe: null,
     claimed: parseUserAgent(ua),
     reverseDns: null,
+    ipLookup: null,
     now: new Date(Date.UTC(2026, 9, 13)),
   };
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { InspectVisitor } from "../src/application/inspect-visitor.js";
 import type { ExposureCheck, Observation, ReverseDns } from "../src/domain/exposure.js";
+import type { IpIntel } from "../src/domain/ip-intel.js";
 import { DnsReverseLookup } from "../src/infrastructure/net/dns-reverse-lookup.js";
 import { UA } from "./fixtures/user-agents.js";
 
@@ -54,6 +55,35 @@ describe("InspectVisitor", () => {
 
     await new InspectVisitor([], resolver).execute(observation("10.42.0.7"), null);
     expect(resolver.asked).toHaveLength(1);
+  });
+
+  it("shows who owns the IP's block, and asks the lists about public addresses only", async () => {
+    const asked: string[] = [];
+    const intel: IpIntel = {
+      lookup: async (ip) => {
+        asked.push(ip);
+        return {
+          origin: { kind: "datacenter", owner: "AWS", detail: "sa-east-1", block: "18.228.0.0/16", feed: "aws" },
+          updatedAt: "2026-10-13T15:00:00.000Z",
+        };
+      },
+    };
+    const report = await new InspectVisitor([], dns(null), intel).execute(observation("::ffff:18.228.4.5"), null);
+    expect(asked).toEqual(["18.228.4.5"]);
+    expect(report.signals).toContainEqual({
+      layer: "rede",
+      label: "dono do bloco",
+      value: "AWS (sa-east-1) · 18.228.0.0/16",
+    });
+
+    await new InspectVisitor([], dns(null), intel).execute(observation("10.42.0.7"), null);
+    expect(asked).toHaveLength(1);
+  });
+
+  it("leaves the block out when no list could be read", async () => {
+    const intel: IpIntel = { lookup: async () => ({ origin: null, updatedAt: null }) };
+    const report = await new InspectVisitor([], dns(null), intel).execute(observation("18.228.4.5"), null);
+    expect(report.signals.map((s) => s.label)).not.toContain("dono do bloco");
   });
 
   it("shows the headers and the browser traits as evidence", async () => {
