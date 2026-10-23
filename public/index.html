@@ -514,11 +514,30 @@
             <div class="grid-frame layer-grid" id="scan-layers"></div>
           </section>
 
-          <section class="block" aria-labelledby="t-handshake">
+          <section class="block" aria-labelledby="t-crowd">
             <div class="rule" aria-hidden="true"></div>
             <div class="block-head">
               <div class="block-title">
                 <span>04</span>
+                <h2 id="t-crowd">Quantos são como você</h2>
+              </div>
+              <p>
+                Nenhum traço seu identifica você sozinho; o que identifica é a combinação. Este servidor conta cada
+                atributo separado — quantas vezes viu esta GPU, este fuso, este canvas — e nunca a combinação, então os
+                números mostram o quanto você se destaca sem que seja possível remontar ninguém.
+              </p>
+            </div>
+            <div class="cell scan-summary" id="crowd-result" aria-live="polite">
+              <p class="muted">escaneando…</p>
+            </div>
+            <p class="muted small" id="crowd-note"></p>
+          </section>
+
+          <section class="block" aria-labelledby="t-handshake">
+            <div class="rule" aria-hidden="true"></div>
+            <div class="block-head">
+              <div class="block-title">
+                <span>05</span>
                 <h2 id="t-handshake">O handshake, byte a byte</h2>
               </div>
               <p id="handshake-intro">
@@ -535,7 +554,7 @@
             <div class="rule" aria-hidden="true"></div>
             <div class="block-head">
               <div class="block-title">
-                <span>05</span>
+                <span>06</span>
                 <h2 id="t-dns">Seu DNS</h2>
               </div>
               <p>
@@ -557,7 +576,7 @@
             <div class="rule" aria-hidden="true"></div>
             <div class="block-head">
               <div class="block-title">
-                <span>06</span>
+                <span>07</span>
                 <h2 id="t-stun">Seu NAT</h2>
               </div>
               <p>
@@ -579,7 +598,7 @@
             <div class="rule" aria-hidden="true"></div>
             <div class="block-head">
               <div class="block-title">
-                <span>07</span>
+                <span>08</span>
                 <h2 id="t-curl">Sem navegador</h2>
               </div>
               <p>O mesmo scan responde a qualquer cliente HTTP. Rode no seu terminal e veja o que ele entrega.</p>

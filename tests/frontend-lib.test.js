@@ -8,6 +8,8 @@ import {
   formatGap,
   candidateAddress,
   citationParts,
+  crowdHeadline,
+  crowdLine,
   commandForSource,
   edgesFor,
   explainTerm,
@@ -268,6 +270,23 @@ describe("scan helpers", () => {
     expect(candidateAddress("a=candidate:2 1 udp 2122194687 3f1c.local 60000 typ host")).toBe("3f1c.local");
     expect(candidateAddress("")).toBeNull();
     expect(candidateAddress(undefined)).toBeNull();
+  });
+
+  it("says how many share one trait", () => {
+    expect(crowdLine({ label: "sua GPU", oneIn: 12 })).toBe("1 em 12 visitantes tem sua GPU");
+    expect(crowdLine({ label: "seu fuso", oneIn: 1 })).toBe("quase todo mundo tem seu fuso");
+  });
+
+  it("leads the crowd section with the rarest trait", () => {
+    expect(crowdHeadline({ counted: 0, traits: [] })).toMatch(/Nenhum visitante contado ainda/);
+    expect(crowdHeadline(null)).toMatch(/Nenhum visitante contado ainda/);
+    expect(crowdHeadline({ counted: 1, traits: [] })).toMatch(/^1 visitante contado/);
+    expect(crowdHeadline({ counted: 40, traits: [{ label: "sua GPU", oneIn: 20 }] })).toBe(
+      "40 visitantes contados desde que o processo subiu. O mais raro: 1 em 20 visitantes tem sua GPU.",
+    );
+    expect(crowdHeadline({ counted: 40, traits: [{ label: "seu fuso", oneIn: 1 }] })).toMatch(
+      /se parece com todo mundo/,
+    );
   });
 
   it("sums the report up in one line, worst first", () => {

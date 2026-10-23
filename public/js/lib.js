@@ -264,6 +264,23 @@ export function scanHeadline({ summary }) {
   return "Nada contraditório e nada exposto que dê para esconder. Raro.";
 }
 
+/** How many share one trait, said the way the page shows it: "1 em 12 visitantes tem sua GPU". */
+export function crowdLine(trait) {
+  const share = trait.oneIn <= 1 ? "quase todo mundo tem" : `1 em ${trait.oneIn} visitantes tem`;
+  return `${share} ${trait.label}`;
+}
+
+/** The crowd section's own line: how much of a crowd there is, and what stands out in it. */
+export function crowdHeadline(crowd) {
+  const counted = crowd?.counted ?? 0;
+  if (!counted) return "Nenhum visitante contado ainda neste processo: o primeiro número vai ser o seu.";
+  const many = `${counted} ${counted === 1 ? "visitante contado" : "visitantes contados"} desde que o processo subiu`;
+  const rarest = crowd.traits?.[0];
+  if (!rarest) return `${many}. Nada do que você mandou apareceu antes.`;
+  if (rarest.oneIn <= 1) return `${many}. Nenhum traço seu é raro aqui: você se parece com todo mundo.`;
+  return `${many}. O mais raro: ${crowdLine(rarest)}.`;
+}
+
 export const RESOLVER_RELATIONS = {
   "mesma-rede": "da sua rede",
   publico: "público",
