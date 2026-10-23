@@ -9,9 +9,10 @@ import type {
   Signal,
   Verdict,
 } from "../domain/exposure.js";
+import type { IpIntel, IpLookup } from "../domain/ip-intel.js";
 import { isGrease } from "../domain/tls.js";
 import { classifyHttp2, HTTP2_FAMILY_NAMES } from "./scan/http2-stack.js";
-import { addressKind, ipVersion, plainIp } from "./scan/ip.js";
+import { addressKind, ipVersion, plainIp } from "../domain/ip.js";
 import { classifyStack, FAMILY_NAMES, tlsView } from "./scan/tls-stack.js";
 import { parseUserAgent } from "./scan/user-agent.js";
 
@@ -38,18 +39,23 @@ export class InspectVisitor {
   constructor(
     private readonly checks: ExposureCheck[],
     private readonly reverseDns: ReverseDns,
+    private readonly ipIntel: IpIntel | null = null,
     private readonly now: () => Date = () => new Date(),
   ) {}
 
   async execute(observation: Observation, probe: ClientProbe | null): Promise<ExposureReport> {
     const ip = plainIp(observation.ip);
     const kind = addressKind(ip);
-    const reverseDns = kind.startsWith("publico") ? await this.reverseDns.lookup(ip) : null;
+    // Both are about the address alone, and neither is asked about an address that is not public.
+    const [reverseDns, ipLookup] = kind.startsWith("publico")
+      ? await Promise.all([this.reverseDns.lookup(ip), this.ipIntel?.lookup(ip) ?? null])
+      : [null, null];
     const ctx: ScanContext = {
       observation,
       probe,
       claimed: parseUserAgent(observation.headers["user-agent"]),
       reverseDns,
+      ipLookup,
       now: this.now(),
     };
 
@@ -66,7 +72,7 @@ export class InspectVisitor {
     return {
       claimed: ctx.claimed,
       signals: [
-        ...networkSignals(observation, reverseDns),
+        ...networkSignals(observation, reverseDns, ipLookup),
         ...httpSignals(observation),
         ...tlsSignals(observation),
         ...browserSignals(probe),
@@ -84,12 +90,25 @@ export class InspectVisitor {
   }
 }
 
-function networkSignals(observation: Observation, reverseDns: string | null): Signal[] {
+function networkSignals(observation: Observation, reverseDns: string | null, ipLookup: IpLookup | null): Signal[] {
   const ip = plainIp(observation.ip);
+  const origin = ipLookup?.origin;
   return [
     { layer: "rede", label: "IP", value: ip },
     { layer: "rede", label: "versão", value: `IPv${ipVersion(ip)}` },
     { layer: "rede", label: "DNS reverso", value: reverseDns ?? "nenhum" },
+    // Only shown when some list was actually read: saying "not a datacenter" without one would be a guess.
+    ...(ipLookup?.updatedAt
+      ? [
+          {
+            layer: "rede" as const,
+            label: "dono do bloco",
+            value: origin
+              ? `${origin.owner}${origin.detail ? ` (${origin.detail})` : ""} · ${origin.block}`
+              : "fora das listas de datacenter e Tor",
+          },
+        ]
+      : []),
     {
       layer: "rede",
       label: "caminho",

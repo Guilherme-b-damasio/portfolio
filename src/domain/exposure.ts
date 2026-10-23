@@ -1,4 +1,5 @@
 import type { Http2Fingerprint } from "./http2.js";
+import type { IpLookup } from "./ip-intel.js";
 import type { TlsFingerprint, TlsView } from "./tls.js";
 
 /** Where a piece of evidence comes from, outermost first. */
@@ -89,6 +90,7 @@ export interface ScanContext {
   probe: ClientProbe | null;
   claimed: ClaimedIdentity;
   reverseDns: string | null;
+  ipLookup: IpLookup | null; // what the published address lists know; null when they are off
   now: Date;
 }
 

@@ -93,6 +93,7 @@ function ctx(ua: string, http2: Http2Fingerprint | null): ScanContext {
     probe: null,
     claimed: parseUserAgent(ua),
     reverseDns: null,
+    ipLookup: null,
     now: new Date(Date.UTC(2026, 9, 20)),
   };
 }

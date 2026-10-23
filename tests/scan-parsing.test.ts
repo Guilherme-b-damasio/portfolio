@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addressKind, plainIp } from "../src/application/scan/ip.js";
+import { addressKind, hostPrefix, parseCidr, plainIp } from "../src/domain/ip.js";
 import { osFromPlatform, parseUserAgent, sameOs } from "../src/application/scan/user-agent.js";
 import { UA } from "./fixtures/user-agents.js";
 
@@ -57,5 +57,17 @@ describe("addresses", () => {
     expect(addressKind("fe80::1")).toBe("local-v6");
     expect(addressKind("2804:14c:1:2::5")).toBe("publico-v6");
     expect(plainIp("::ffff:10.0.0.1")).toBe("10.0.0.1");
+  });
+
+  it("reads the blocks the published lists are written in", () => {
+    expect(parseCidr("18.228.0.0/16")).toEqual({ network: "18.228.0.0", prefix: 16 });
+    expect(parseCidr(" 2600:1f00::/24 ")).toEqual({ network: "2600:1f00::", prefix: 24 });
+    expect(parseCidr("18.228.0.0")).toBeNull();
+    expect(parseCidr("18.228.0.0/")).toBeNull();
+    expect(parseCidr("18.228.0.0/33")).toBeNull();
+    expect(parseCidr("2600:1f00::/129")).toBeNull();
+    expect(parseCidr("casa/16")).toBeNull();
+    expect(hostPrefix("185.220.101.4")).toBe(32);
+    expect(hostPrefix("2a0b:f4c2::1")).toBe(128);
   });
 });

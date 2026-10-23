@@ -7,7 +7,7 @@ import type {
   ResolverView,
 } from "../domain/dns-leak.js";
 import type { ReverseDns, Verdict } from "../domain/exposure.js";
-import { addressKind, inPrefix, ipVersion, plainIp } from "./scan/ip.js";
+import { addressKind, inPrefix, ipVersion, plainIp } from "../domain/ip.js";
 
 // Public resolvers, by the name of the address they query from or by their published egress ranges.
 // Their egress addresses often have no PTR, so the ranges catch what the names miss.

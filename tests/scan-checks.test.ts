@@ -17,7 +17,7 @@ import {
   PrivacySignalCheck,
   ToolClientCheck,
 } from "../src/application/scan/checks/http.js";
-import { ReverseDnsCheck, WebRtcLeakCheck } from "../src/application/scan/checks/network.js";
+import { IpOriginCheck, ReverseDnsCheck, WebRtcLeakCheck } from "../src/application/scan/checks/network.js";
 import { parseUserAgent } from "../src/application/scan/user-agent.js";
 import type { ClientProbe, ExposureCheck, ScanContext, Verdict } from "../src/domain/exposure.js";
 import { UA } from "./fixtures/user-agents.js";
@@ -37,6 +37,7 @@ function ctx(ua: string, headers: Record<string, string> = {}, probe: ClientProb
     probe,
     claimed: parseUserAgent(ua),
     reverseDns: null,
+    ipLookup: null,
     now: NOW,
   };
 }
@@ -195,5 +196,36 @@ describe("network checks", () => {
     const named = { ...ctx(UA.chromeWin), reverseDns: "200-150-1-2.user.provedor.net.br" };
     expect(new ReverseDnsCheck().run(named)[0]).toMatchObject({ verdict: "exposto" });
     expect(verdicts(new ReverseDnsCheck(), ctx(UA.chromeWin))).toEqual(["ok"]);
+  });
+
+  it("says whose network the address is, and stays quiet without lists", () => {
+    const check = new IpOriginCheck();
+    const UPDATED = "2026-10-13T15:00:00.000Z";
+    const lookup = (origin: NonNullable<ScanContext["ipLookup"]>["origin"]) => ({
+      ...ctx(UA.chromeWin),
+      ipLookup: { origin, updatedAt: UPDATED },
+    });
+
+    expect(check.run(ctx(UA.chromeWin))).toEqual([]);
+    expect(ids(check, { ...ctx(UA.chromeWin), ipLookup: { origin: null, updatedAt: null } })).toEqual([]);
+    expect(ids(check, lookup(null))).toEqual(["ip-origin-comum"]);
+
+    const aws = lookup({
+      kind: "datacenter",
+      owner: "AWS",
+      detail: "sa-east-1",
+      block: "18.228.0.0/16",
+      feed: "aws",
+    });
+    expect(check.run(aws)[0]).toMatchObject({ id: "ip-origin-datacenter", verdict: "info" });
+    expect(check.run(aws)[0].title).toContain("AWS");
+    expect(check.run(aws)[0].evidence).toEqual([
+      "IP 200.150.1.2 no bloco 18.228.0.0/16 (AWS · sa-east-1)",
+      "lista: aws",
+      `listas carregadas em ${UPDATED}`,
+    ]);
+
+    const tor = lookup({ kind: "tor", owner: "Tor", detail: "nó de saída", block: "185.220.101.4/32", feed: "tor" });
+    expect(check.run(tor)[0]).toMatchObject({ id: "ip-origin-tor", verdict: "info" });
   });
 });

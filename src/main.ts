@@ -46,6 +46,14 @@ import { AlpnServer } from "./infrastructure/http2/alpn-server.js";
 import { Http1Bridge } from "./infrastructure/http2/http1-bridge.js";
 import { TrackedHttp2Connections } from "./infrastructure/http2/tracked-http2-connections.js";
 import { DnsReverseLookup } from "./infrastructure/net/dns-reverse-lookup.js";
+import { FeedIpIntel } from "./infrastructure/net/feed-ip-intel.js";
+import { httpText } from "./infrastructure/net/http-text.js";
+import {
+  AwsRangesFeed,
+  AzureServiceTagsFeed,
+  GcpRangesFeed,
+  TorExitFeed,
+} from "./infrastructure/net/ip-range-feeds.js";
 import { InMemoryNatBindings } from "./infrastructure/stun/in-memory-bindings.js";
 import { StunServer } from "./infrastructure/stun/stun-server.js";
 import { FileTlsSamples } from "./infrastructure/tls/file-tls-samples.js";
@@ -90,6 +98,23 @@ const stopSampling = history.start();
 const logger = new JsonLogger();
 // The last 500 API requests, step by step, for `trace <id>`.
 const traces = new InMemoryTraces({ capacity: 500 });
+// Who owns the visitor's IP, from lists their publishers keep: the Tor exits and the blocks AWS,
+// Google Cloud and Azure announce. Downloaded at most once every IP_INTEL_REFRESH_HOURS and matched
+// in memory, so a scan never waits on them; IP_INTEL=off drops the whole layer. Azure's file is
+// published under a URL with the week's date in it, so that feed waits for AZURE_SERVICE_TAGS_URL.
+const azureTags = process.env.AZURE_SERVICE_TAGS_URL;
+const ipIntel =
+  process.env.IP_INTEL === "off"
+    ? null
+    : new FeedIpIntel(
+        [
+          new TorExitFeed(httpText(2_000_000)),
+          new AwsRangesFeed(httpText(8_000_000)),
+          new GcpRangesFeed(httpText(2_000_000)),
+          ...(azureTags ? [new AzureServiceTagsFeed(httpText(24_000_000), azureTags)] : []),
+        ],
+        { refreshMs: Number(process.env.IP_INTEL_REFRESH_HOURS ?? 12) * 3_600_000, logger },
+      );
 // With a certificate the app also terminates TLS itself, so the scan can read each visitor's ClientHello.
 // In the cluster this needs a TCP passthrough route; behind a TLS-terminating proxy there is nothing to read.
 const certFile = process.env.TLS_CERT_FILE;
@@ -189,7 +214,7 @@ const app = createApp({
     clusterReader ? clusterReader.namespaces : null,
   ),
   sendContact: new SendContact(mailer),
-  inspectVisitor: new InspectVisitor(scanChecks(), new DnsReverseLookup()),
+  inspectVisitor: new InspectVisitor(scanChecks(), new DnsReverseLookup(), ipIntel),
   tapped: tap,
   http2: http2Connections,
   tlsSamples: new BrowseTlsSamples(await FileTlsSamples.load(path.join(root, "data", "tls-samples"))),
@@ -237,6 +262,7 @@ const server = app.listen(port, () => {
     docsage: docsage ? "on" : "off",
     contact: mailer ? "on" : "off",
     cluster: clusterReader ? clusterNamespaces.join(",") : "off",
+    ipIntel: ipIntel ? `tor,aws,gcp${azureTags ? ",azure" : ""}` : "off",
   });
 });
 

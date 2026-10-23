@@ -1,3 +1,6 @@
+// Addresses as the whole app reads them: the visitor scan, the DNS leak zone and the STUN sightings
+// all parse and compare the same way, so these live in the domain.
+
 /** Strips the IPv4-mapped IPv6 prefix Node puts on IPv4 clients ("::ffff:1.2.3.4"). */
 export function plainIp(ip: string): string {
   return ip.replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, "");
@@ -56,4 +59,20 @@ export function inPrefix(ip: string, network: string, prefix: number): boolean {
     if ((a[bit / 8] & mask) !== (b[bit / 8] & mask)) return false;
   }
   return true;
+}
+
+/** "52.94.76.0/22" as its parts, or null when it is not a block. */
+export function parseCidr(text: string): { network: string; prefix: number } | null {
+  const parts = text.trim().split("/");
+  if (parts.length !== 2) return null;
+  const [network, bits] = parts;
+  const bytes = ipBytes(network);
+  const prefix = Number(bits);
+  if (!bytes || !bits || !Number.isInteger(prefix) || prefix < 0 || prefix > bytes.length * 8) return null;
+  return { network, prefix };
+}
+
+/** How many bits name a single address of that family: 32 or 128. */
+export function hostPrefix(ip: string): 32 | 128 {
+  return ipVersion(ip) === 4 ? 32 : 128;
 }

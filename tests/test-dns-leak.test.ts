@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { registeredDomain, TestDnsLeak } from "../src/application/test-dns-leak.js";
-import { inPrefix, ipBytes } from "../src/application/scan/ip.js";
+import { inPrefix, ipBytes } from "../src/domain/ip.js";
 import type { ClientSubnet } from "../src/domain/dns-leak.js";
 import { InMemoryLeakProbes } from "../src/infrastructure/dns/in-memory-leak-probes.js";
 
