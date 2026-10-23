@@ -1,4 +1,4 @@
-import { type IpIntel, type IpOrigin, type IpRangeFeed, IpRangeIndex } from "../../domain/ip-intel.js";
+import { type IpIntel, type IpLookup, type IpRangeFeed, IpRangeIndex } from "../../domain/ip-intel.js";
 import type { Logger } from "../../domain/logger.js";
 
 export interface FeedIpIntelOptions {
@@ -42,7 +42,7 @@ export class FeedIpIntel implements IpIntel {
     this.now = now;
   }
 
-  async origin(ip: string): Promise<IpOrigin | null> {
+  async lookup(ip: string): Promise<IpLookup> {
     const stale = !this.loaded || this.now() - this.loaded.at >= this.refreshMs;
     const loading = stale ? this.load() : null;
     // With lists in hand the answer is immediate, even while a refresh runs behind it.
@@ -57,14 +57,16 @@ export class FeedIpIntel implements IpIntel {
         clearTimeout(timer);
       }
     }
-    const match = this.loaded?.index.match(ip);
-    if (!match || !this.loaded) return null;
+    if (!this.loaded) return { origin: null, updatedAt: null };
+    const match = this.loaded.index.match(ip);
     return {
-      kind: match.kind,
-      owner: match.owner,
-      detail: match.detail,
-      block: `${match.network}/${match.prefix}`,
-      feed: match.feed,
+      origin: match && {
+        kind: match.kind,
+        owner: match.owner,
+        detail: match.detail,
+        block: `${match.network}/${match.prefix}`,
+        feed: match.feed,
+      },
       updatedAt: new Date(this.loaded.at).toISOString(),
     };
   }

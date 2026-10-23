@@ -25,7 +25,16 @@ export interface IpOrigin {
   detail: string | null;
   block: string; // the block that matched, as "network/prefix"
   feed: string;
-  updatedAt: string; // when the lists behind this answer were loaded
+}
+
+/**
+ * What the lists had to say. An address no feed claims is not the same answer as having no lists
+ * at all, so `updatedAt` carries when the lists behind this answer were loaded, and is null when
+ * none could be: the scan says "I did not look" instead of "nobody owns this".
+ */
+export interface IpLookup {
+  origin: IpOrigin | null;
+  updatedAt: string | null;
 }
 
 /**
@@ -33,7 +42,7 @@ export interface IpOrigin {
  * request path, so a lookup never waits on the network.
  */
 export interface IpIntel {
-  origin(ip: string): Promise<IpOrigin | null>;
+  lookup(ip: string): Promise<IpLookup>;
 }
 
 /** One block with the feed it came from. */

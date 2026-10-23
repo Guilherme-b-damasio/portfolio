@@ -34,19 +34,15 @@ describe("FeedIpIntel", () => {
     let clock = 0;
     const intel = new FeedIpIntel([feed], { refreshMs: 1_000, now: () => clock });
 
-    expect(await intel.origin("18.228.4.5")).toEqual({
-      kind: "datacenter",
-      owner: "AWS",
-      detail: "sa-east-1",
-      block: "18.228.0.0/16",
-      feed: "aws",
+    expect(await intel.lookup("18.228.4.5")).toEqual({
+      origin: { kind: "datacenter", owner: "AWS", detail: "sa-east-1", block: "18.228.0.0/16", feed: "aws" },
       updatedAt: new Date(0).toISOString(),
     });
-    expect(await intel.origin("200.150.1.2")).toBeNull();
+    expect(await intel.lookup("200.150.1.2")).toEqual({ origin: null, updatedAt: new Date(0).toISOString() });
     expect(feed.reads).toBe(1);
 
     clock = 1_001;
-    expect(await intel.origin("18.228.4.5")).toMatchObject({ owner: "AWS" });
+    expect(await intel.lookup("18.228.4.5")).toMatchObject({ origin: { owner: "AWS" } });
     expect(feed.reads).toBe(2);
   });
 
@@ -54,15 +50,15 @@ describe("FeedIpIntel", () => {
     const log = logger();
     const feed = fakeFeed("aws", [aws]);
     const intel = new FeedIpIntel([broken("tor"), feed], { logger: log });
-    expect(await intel.origin("18.228.4.5")).toMatchObject({ owner: "AWS" });
+    expect(await intel.lookup("18.228.4.5")).toMatchObject({ origin: { owner: "AWS" } });
     expect(log.errors).toEqual(["could not read an address list"]);
   });
 
-  it("answers null and tries again when no feed could be read", async () => {
+  it("says it has no lists, and tries again, when no feed could be read", async () => {
     const log = logger();
     const intel = new FeedIpIntel([broken("tor")], { logger: log });
-    expect(await intel.origin("18.228.4.5")).toBeNull();
-    expect(await intel.origin("18.228.4.5")).toBeNull();
+    expect(await intel.lookup("18.228.4.5")).toEqual({ origin: null, updatedAt: null });
+    expect(await intel.lookup("18.228.4.5")).toEqual({ origin: null, updatedAt: null });
     expect(log.errors).toHaveLength(2);
   });
 
@@ -74,17 +70,17 @@ describe("FeedIpIntel", () => {
     };
     const intel = new FeedIpIntel([slow], { deadlineMs: 5 });
 
-    expect(await intel.origin("18.228.4.5")).toBeNull();
+    expect(await intel.lookup("18.228.4.5")).toEqual({ origin: null, updatedAt: null });
     release();
-    await vi.waitUntil(async () => (await intel.origin("18.228.4.5")) !== null, { timeout: 500 });
-    expect(await intel.origin("18.228.4.5")).toMatchObject({ owner: "AWS" });
+    await vi.waitUntil(async () => (await intel.lookup("18.228.4.5")).origin !== null, { timeout: 500 });
+    expect(await intel.lookup("18.228.4.5")).toMatchObject({ origin: { owner: "AWS" } });
   });
 
   it("shares one load between the visitors that arrive together", async () => {
     const feed = fakeFeed("aws", [aws]);
     const intel = new FeedIpIntel([feed]);
-    const answers = await Promise.all([intel.origin("18.228.4.5"), intel.origin("18.228.4.6")]);
-    expect(answers.every((a) => a?.owner === "AWS")).toBe(true);
+    const answers = await Promise.all([intel.lookup("18.228.4.5"), intel.lookup("18.228.4.6")]);
+    expect(answers.every((a) => a.origin?.owner === "AWS")).toBe(true);
     expect(feed.reads).toBe(1);
   });
 });
