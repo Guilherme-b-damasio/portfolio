@@ -1,3 +1,4 @@
+import type { CrowdCounts, CrowdView } from "../domain/anonymity.js";
 import type {
   ClientProbe,
   ExposureCheck,
@@ -14,6 +15,7 @@ import { isGrease } from "../domain/tls.js";
 import { classifyHttp2, HTTP2_FAMILY_NAMES } from "./scan/http2-stack.js";
 import { addressKind, ipVersion, plainIp } from "../domain/ip.js";
 import { classifyStack, FAMILY_NAMES, tlsView } from "./scan/tls-stack.js";
+import { visitorTraits } from "./scan/traits.js";
 import { parseUserAgent } from "./scan/user-agent.js";
 
 const ORDER: Record<Verdict, number> = { contradicao: 0, exposto: 1, info: 2, ok: 3 };
@@ -40,6 +42,7 @@ export class InspectVisitor {
     private readonly checks: ExposureCheck[],
     private readonly reverseDns: ReverseDns,
     private readonly ipIntel: IpIntel | null = null,
+    private readonly crowd: CrowdCounts | null = null,
     private readonly now: () => Date = () => new Date(),
   ) {}
 
@@ -58,6 +61,14 @@ export class InspectVisitor {
       ipLookup,
       now: this.now(),
     };
+
+    // The crowd counts a visitor only when the browser answered: a scan with curl is not a visitor,
+    // and a report of its own traits would be a report of one.
+    const traits = visitorTraits(ctx);
+    if (probe) this.crowd?.record(traits);
+    const crowd: CrowdView | null = this.crowd
+      ? { since: this.crowd.since, counted: this.crowd.counted, traits: this.crowd.rarity(traits) }
+      : null;
 
     const findings: Finding[] = [];
     for (const check of this.checks) {
@@ -84,6 +95,7 @@ export class InspectVisitor {
         checks: this.checks.length,
         probe: probe != null,
       },
+      crowd,
       tls: observation.tls && tlsView(observation.tls),
       scannedAt: ctx.now.toISOString(),
     };

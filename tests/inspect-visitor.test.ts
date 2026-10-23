@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { InspectVisitor } from "../src/application/inspect-visitor.js";
 import type { ExposureCheck, Observation, ReverseDns } from "../src/domain/exposure.js";
 import type { IpIntel } from "../src/domain/ip-intel.js";
+import { InMemoryCrowd } from "../src/infrastructure/anonymity/in-memory-crowd.js";
 import { DnsReverseLookup } from "../src/infrastructure/net/dns-reverse-lookup.js";
 import { UA } from "./fixtures/user-agents.js";
 
@@ -84,6 +85,39 @@ describe("InspectVisitor", () => {
     const intel: IpIntel = { lookup: async () => ({ origin: null, updatedAt: null }) };
     const report = await new InspectVisitor([], dns(null), intel).execute(observation("18.228.4.5"), null);
     expect(report.signals.map((s) => s.label)).not.toContain("dono do bloco");
+  });
+
+  it("counts the visitor's traits and says how rare each one is", async () => {
+    const crowd = new InMemoryCrowd();
+    const visitor = new InspectVisitor([], dns(null), null, crowd);
+    const here = { timezone: "America/Sao_Paulo", languages: ["pt-BR"] };
+    await visitor.execute(observation("200.150.1.2"), { ...here, webgl: { renderer: "Adreno 730" } });
+    const report = await visitor.execute(observation("200.150.1.2"), { ...here, webgl: { renderer: "RTX 3060" } });
+
+    expect(report.crowd).toMatchObject({ counted: 2, since: crowd.since });
+    const traits = report.crowd?.traits ?? [];
+    expect(traits.find((t) => t.attribute === "gpu")).toMatchObject({
+      label: "sua GPU",
+      value: "RTX 3060",
+      matching: 1,
+      total: 2,
+      oneIn: 2,
+    });
+    expect(traits.find((t) => t.attribute === "fuso")).toMatchObject({ matching: 2, oneIn: 1 });
+    // Rarest first, so the page leads with what gives the visitor away.
+    expect(traits[0].attribute).toBe("gpu");
+  });
+
+  it("counts nothing when the browser did not answer", async () => {
+    const crowd = new InMemoryCrowd();
+    const report = await new InspectVisitor([], dns(null), null, crowd).execute(observation("1.1.1.1"), null);
+    expect(crowd.counted).toBe(0);
+    expect(report.crowd).toEqual({ since: crowd.since, counted: 0, traits: [] });
+  });
+
+  it("leaves the crowd out when nothing is counting", async () => {
+    const report = await new InspectVisitor([], dns(null)).execute(observation("1.1.1.1"), null);
+    expect(report.crowd).toBeNull();
   });
 
   it("shows the headers and the browser traits as evidence", async () => {
