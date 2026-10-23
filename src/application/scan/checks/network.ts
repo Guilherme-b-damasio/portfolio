@@ -1,5 +1,5 @@
 import type { ExposureCheck, Finding, ScanContext } from "../../../domain/exposure.js";
-import { addressKind, plainIp } from "../ip.js";
+import { addressKind, plainIp } from "../../../domain/ip.js";
 
 /**
  * WebRTC gathers the device's own addresses before any connection exists. Modern browsers hide

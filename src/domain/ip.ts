@@ -1,3 +1,6 @@
+// Addresses as the whole app reads them: the visitor scan, the DNS leak zone and the STUN sightings
+// all parse and compare the same way, so these live in the domain.
+
 /** Strips the IPv4-mapped IPv6 prefix Node puts on IPv4 clients ("::ffff:1.2.3.4"). */
 export function plainIp(ip: string): string {
   return ip.replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, "");

@@ -7,7 +7,7 @@ import type {
   StunSighting,
   StunView,
 } from "../domain/stun.js";
-import { ipVersion, plainIp } from "./scan/ip.js";
+import { ipVersion, plainIp } from "../domain/ip.js";
 
 /**
  * The NAT probe: the browser gathers ICE candidates against this server's own STUN sockets, and

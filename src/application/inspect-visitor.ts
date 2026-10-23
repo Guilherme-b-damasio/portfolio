@@ -11,7 +11,7 @@ import type {
 } from "../domain/exposure.js";
 import { isGrease } from "../domain/tls.js";
 import { classifyHttp2, HTTP2_FAMILY_NAMES } from "./scan/http2-stack.js";
-import { addressKind, ipVersion, plainIp } from "./scan/ip.js";
+import { addressKind, ipVersion, plainIp } from "../domain/ip.js";
 import { classifyStack, FAMILY_NAMES, tlsView } from "./scan/tls-stack.js";
 import { parseUserAgent } from "./scan/user-agent.js";
 

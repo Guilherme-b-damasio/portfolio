@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addressKind, plainIp } from "../src/application/scan/ip.js";
+import { addressKind, plainIp } from "../src/domain/ip.js";
 import { osFromPlatform, parseUserAgent, sameOs } from "../src/application/scan/user-agent.js";
 import { UA } from "./fixtures/user-agents.js";
 
