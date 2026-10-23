@@ -60,3 +60,19 @@ export function inPrefix(ip: string, network: string, prefix: number): boolean {
   }
   return true;
 }
+
+/** "52.94.76.0/22" as its parts, or null when it is not a block. */
+export function parseCidr(text: string): { network: string; prefix: number } | null {
+  const parts = text.trim().split("/");
+  if (parts.length !== 2) return null;
+  const [network, bits] = parts;
+  const bytes = ipBytes(network);
+  const prefix = Number(bits);
+  if (!bytes || !bits || !Number.isInteger(prefix) || prefix < 0 || prefix > bytes.length * 8) return null;
+  return { network, prefix };
+}
+
+/** How many bits name a single address of that family: 32 or 128. */
+export function hostPrefix(ip: string): 32 | 128 {
+  return ipVersion(ip) === 4 ? 32 : 128;
+}
