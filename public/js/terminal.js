@@ -24,6 +24,7 @@ import {
   podRows,
   rememberTurn,
   resolverParts,
+  crowdHeadline,
   scanHeadline,
   scoreBar,
   sections,
@@ -710,6 +711,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         const tag = `${marks[f.verdict]} ${VERDICTS[f.verdict]}`.padEnd(15);
         print(line([f.verdict === "info" ? dim(tag) : warn(tag), f.title]));
       }
+      if (body.crowd?.counted) say(dim(crowdHeadline(body.crowd)));
       const ok = body.findings.filter((f) => f.verdict === "ok").length;
       say(
         dim(`${ok} verificações ok · ${body.summary.checks} regras · nada foi salvo  `),

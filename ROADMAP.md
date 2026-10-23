@@ -110,7 +110,7 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
   - [x] Manifest de exemplo (Service UDP) em `k8s/stun.example.yaml`
   - [ ] **[dono]** Porta UDP exposta no cluster
 - [x] Inteligência de IP: nós de saída do Tor e faixas de datacenter (AWS/GCP/Azure), com refresh limitado
-- [ ] Anonimato agregado: "1 em N visitantes tem sua GPU", com contagens por atributo em memória e sem fingerprint individual
+- [x] Anonimato agregado: "1 em N visitantes tem sua GPU", com contagens por atributo em memória e sem fingerprint individual
 - [x] Diagrama de arquitetura vivo: SVG em que cada requisição real acende o caminho que percorreu
 
 ## 0.5 Polimento

@@ -91,6 +91,24 @@ Portuguese stemmer (`src/infrastructure/search/portuguese-stemmer.ts`), so "trab
 - `deploys` follows each push from commit to image build (GitHub Actions) to the tag Flux picked to
   the rollout and pod Ready, each source failing on its own.
 
+## What's new in 0.4
+
+- Five playgrounds where the server is the exhibit: the rate limit lab draws the visitor's own
+  bucket from the real headers, the search playground reranks the chat's BM25 index with the
+  visitor's `k1`, `b` and top-k, the load lab fires up to 200 requests at this process over
+  loopback (one run at a time for everyone, streamed over SSE), `/mcp` serves this site as a
+  read-only MCP server, and the architecture diagram lights the path each real request took.
+- `/voce` and `scan` cross-examine the visitor's own connection across four layers and report
+  where they disagree: the published address lists say whose network the IP is (Tor exit, AWS,
+  Google Cloud, Azure), the app's own TLS listener reads the ClientHello for JA4 and the h2
+  preface for the Akamai fingerprint, its own authoritative DNS zone catches a resolver escaping
+  a VPN, and its own STUN sockets show how the NAT maps a port.
+- The same page says how common the visitor is — "1 em N visitantes tem sua GPU" — from counters
+  kept per attribute, never per visitor, so the numbers can exist without a fingerprint behind them.
+- Still with the owner: the TLS passthrough route and certificate in the cluster, the NS delegation
+  and 53/udp for the DNS zone, and the UDP ports for STUN. The example manifests are in `k8s/`,
+  and each feature says it is off until they exist.
+
 ## API
 
 | Route                     | Notes                                       |
@@ -116,7 +134,7 @@ Portuguese stemmer (`src/infrastructure/search/portuguese-stemmer.ts`), so "trab
 | `POST /api/lab/load`      | The load lab: `{ target, requests ≤ 200, concurrency ≤ 10 }` fired by the server at one of its own routes over loopback (`healthz`, `projects`, `status`), streamed over SSE: `queued` with the position while another run is going, `start`, one `sample` per request (`status`, `ms`), then `done` with p50/p95/p99, max and req/s. One run at a time across every visitor, at most 5 waiting (503 + `Retry-After` past that), 30 s per run, 3 runs per visitor per minute. `load [n] [c]` in the terminal |
 | `GET /api/lab/load`       | Whether the load runner is busy, how many are waiting, the limits and the targets |
 | `GET /api/scan`           | What the bare request gives away (try it with curl); never cached |
-| `POST /api/scan`          | Same, plus the browser probe from `/voce`: findings where the layers contradict each other. 10 per visitor per minute |
+| `POST /api/scan`          | Same, plus the browser probe from `/voce`: findings where the layers contradict each other, and `crowd` with how many of the visitors counted so far share each trait. Only a scan with a probe is counted. 10 per visitor per minute |
 | `GET /api/scan/tls-samples` | Real ClientHellos captured from known clients (`data/tls-samples/`), with JA4 and every byte annotated |
 | `GET /api/status`         | Uptime, memory, pod/node, p50/p95 per route, tokens spent today (`llmBudget`), and `cluster: { namespaces }` when the pod can read its cluster |
 | `GET /api/cluster`        | Nodes (with CPU and memory against capacity) and the pods of every visible namespace, read from the Kubernetes API; 503 with `off: true` outside a cluster, 503 + `Retry-After` when the API server is out of reach |
@@ -170,6 +188,21 @@ third party, and "no list claims this address" is answered apart from "no list c
 the scan never calls an address residential when it simply did not look. `IP_INTEL=off` drops the
 layer; Azure's Service Tags file is published under a URL carrying the week's date, so that feed
 waits for `AZURE_SERVICE_TAGS_URL`.
+
+### How common you are (aggregate counts)
+
+No single trait identifies anyone; the combination does. So the scan counts the traits and never
+the combination: `InMemoryCrowd` keeps one counter per attribute and value — how many visitors
+showed this GPU, this time zone, this canvas hash, this JA4 — and nothing that ties two attributes
+of the same visitor together, which is exactly why the numbers can be shown. The report carries
+each trait with how many of the counted visitors share it, rarest first, and `/voce` reads it as
+"1 em 12 visitantes tem sua GPU".
+
+Only a scan the browser answered is counted (curl is not a visitor), each attribute keeps a bounded
+number of distinct values and counts the rest in one overflow bucket, so a visitor who sends a new
+value on every request cannot grow the process, and the counters live in this process alone: they
+start empty and are gone on the next deploy. Nothing is written down, so a restart is the only
+retention policy there is.
 
 ### TLS fingerprint (JA4)
 

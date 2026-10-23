@@ -37,6 +37,7 @@ import { LeakZone } from "./infrastructure/dns/leak-zone.js";
 import { loadEvalSet } from "./infrastructure/evals/json-eval-set.js";
 import { LoopbackTarget } from "./infrastructure/load/loopback-target.js";
 import { JsonLogger } from "./infrastructure/logging/json-logger.js";
+import { InMemoryCrowd } from "./infrastructure/anonymity/in-memory-crowd.js";
 import { AnthropicPriceList } from "./infrastructure/llm/anthropic-price-list.js";
 import { ClaudeAnswerer } from "./infrastructure/llm/claude-answerer.js";
 import { DailyTokenBudget } from "./infrastructure/llm/daily-token-budget.js";
@@ -102,6 +103,8 @@ const traces = new InMemoryTraces({ capacity: 500 });
 // Google Cloud and Azure announce. Downloaded at most once every IP_INTEL_REFRESH_HOURS and matched
 // in memory, so a scan never waits on them; IP_INTEL=off drops the whole layer. Azure's file is
 // published under a URL with the week's date in it, so that feed waits for AZURE_SERVICE_TAGS_URL.
+// "1 em N visitantes tem sua GPU": counters per attribute, in this process and nowhere else.
+const crowd = new InMemoryCrowd();
 const azureTags = process.env.AZURE_SERVICE_TAGS_URL;
 const ipIntel =
   process.env.IP_INTEL === "off"
@@ -214,7 +217,7 @@ const app = createApp({
     clusterReader ? clusterReader.namespaces : null,
   ),
   sendContact: new SendContact(mailer),
-  inspectVisitor: new InspectVisitor(scanChecks(), new DnsReverseLookup(), ipIntel),
+  inspectVisitor: new InspectVisitor(scanChecks(), new DnsReverseLookup(), ipIntel, crowd),
   tapped: tap,
   http2: http2Connections,
   tlsSamples: new BrowseTlsSamples(await FileTlsSamples.load(path.join(root, "data", "tls-samples"))),

@@ -18,6 +18,7 @@ import {
   ToolClientCheck,
 } from "../src/application/scan/checks/http.js";
 import { IpOriginCheck, ReverseDnsCheck, WebRtcLeakCheck } from "../src/application/scan/checks/network.js";
+import { visitorTraits } from "../src/application/scan/traits.js";
 import { parseUserAgent } from "../src/application/scan/user-agent.js";
 import type { ClientProbe, ExposureCheck, ScanContext, Verdict } from "../src/domain/exposure.js";
 import { UA } from "./fixtures/user-agents.js";
@@ -227,5 +228,39 @@ describe("network checks", () => {
 
     const tor = lookup({ kind: "tor", owner: "Tor", detail: "nó de saída", block: "185.220.101.4/32", feed: "tor" });
     expect(check.run(tor)[0]).toMatchObject({ id: "ip-origin-tor", verdict: "info" });
+  });
+});
+
+describe("visitorTraits", () => {
+  it("takes the coarse facts, one attribute at a time", () => {
+    const traits = visitorTraits(
+      ctx(
+        UA.chromeWin,
+        {},
+        {
+          webgl: { renderer: "ANGLE (NVIDIA GeForce RTX 3060)" },
+          screen: { width: 2560, height: 1440, pixelRatio: 1, colorDepth: 24 },
+          timezone: "America/Sao_Paulo",
+          languages: ["pt-BR", "en"],
+          hardwareConcurrency: 16,
+          canvasHash: "9f2a71bc",
+        },
+      ),
+    );
+    expect(Object.fromEntries(traits.map((t) => [t.attribute, t.value]))).toEqual({
+      navegador: "chrome 153",
+      sistema: "windows",
+      gpu: "ANGLE (NVIDIA GeForce RTX 3060)",
+      tela: "2560×1440 @1x",
+      fuso: "America/Sao_Paulo",
+      idioma: "pt-BR",
+      nucleos: "16",
+      canvas: "9f2a71bc",
+    });
+  });
+
+  it("keeps only what a bare request gives away when no script ran", () => {
+    expect(visitorTraits(ctx(UA.curl)).map((t) => t.attribute)).toEqual(["navegador", "sistema"]);
+    expect(visitorTraits(ctx(UA.curl))[0].value).toBe("curl");
   });
 });

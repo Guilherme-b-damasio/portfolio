@@ -1,3 +1,4 @@
+import type { CrowdView } from "./anonymity.js";
 import type { Http2Fingerprint } from "./http2.js";
 import type { IpLookup } from "./ip-intel.js";
 import type { TlsFingerprint, TlsView } from "./tls.js";
@@ -110,6 +111,7 @@ export interface ExposureReport {
   signals: Signal[];
   findings: Finding[];
   summary: { exposures: number; contradictions: number; checks: number; probe: boolean };
+  crowd: CrowdView | null; // how common the visitor is among everyone this process counted
   tls: TlsView | null; // the visitor's own ClientHello, for the annotated hex dump
   scannedAt: string;
 }

@@ -2,7 +2,7 @@ import { api } from "../api.js";
 import { runDnsLeak } from "../dns-leak.js";
 import { copyText, el } from "../dom.js";
 import { createHexDump } from "../hexdump.js";
-import { resolverParts, scanHeadline, VERDICTS } from "../lib.js";
+import { ago, crowdHeadline, crowdLine, resolverParts, scanHeadline, VERDICTS } from "../lib.js";
 import { collectProbe } from "../probe.js";
 import { candidateParts, runStun } from "../stun.js";
 
@@ -107,6 +107,7 @@ export function createVocePage({ root }) {
       ),
     );
 
+    renderCrowd(report.crowd);
     $("#scan-findings").replaceChildren(...report.findings.map(findingItem));
     $("#scan-layers").replaceChildren(
       ...LAYERS.map(([id, title, blurb]) => {
@@ -126,6 +127,34 @@ export function createVocePage({ root }) {
         );
       }),
     );
+  }
+
+  /** The aggregate counters: how many of the visitors counted so far share each trait. */
+  function renderCrowd(crowd) {
+    if (!crowd) {
+      $("#crowd-result").replaceChildren(el("p", {}, "A contagem agregada está desligada neste servidor."));
+      $("#crowd-note").textContent = "";
+      return;
+    }
+    $("#crowd-result").replaceChildren(
+      el("p", { class: "scan-headline" }, crowdHeadline(crowd)),
+      crowd.traits.length
+        ? el(
+            "dl",
+            { class: "signal-list" },
+            crowd.traits.map((t) =>
+              el(
+                "div",
+                { class: "fact-row" },
+                el("dt", {}, crowdLine(t)),
+                el("dd", {}, t.capped ? `${t.value} · contado junto com outros valores` : t.value),
+              ),
+            ),
+          )
+        : el("p", { class: "small" }, "Nada do que o seu navegador mandou tinha aparecido antes neste processo."),
+    );
+    $("#crowd-note").textContent =
+      `Contagens deste processo, começadas ${ago(crowd.since)} e zeradas no próximo deploy. Cada atributo é contado sozinho: nada liga a sua GPU ao seu fuso.`;
   }
 
   async function renderHandshakes() {
