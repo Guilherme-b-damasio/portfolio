@@ -122,11 +122,33 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 - [x] Alternância de tema claro/escuro
 - [ ] Versão em inglês (conteúdo bilíngue, `?lang=en`)
 - [ ] Imagem de compartilhamento (OG), meta tags e `robots.txt`
+  - [ ] `robots.txt`, `meta description`, `canonical` e as tags OG/Twitter servidas pelo app, com teste
+        conferindo o que vai no HTML
+  - [ ] O cartão OG desenhado em SVG e rasterizado no build (decidir a dependência de rasterização;
+        nada disso entra na imagem que roda no VPS)
 - [x] Páginas `/sobre`, `/projetos`, `/mcp` e `/contato` (design v2), com skills que apontam para provas reais
 - [ ] **[dono]** Ligar o formulário de contato: secret com `RESEND_API_KEY` e `CONTACT_TO` no cluster
 - [ ] Acessibilidade: terminal usável só com teclado e leitor de tela; Lighthouse ≥ 95
+
+## 0.6 Mais provas
+
+- [ ] `top`: event loop lag, heap, handles e GC deste processo por SSE, com teto de streams simultâneos
+      e o painel "Ao vivo" mostrando o lag junto da latência
+- [ ] Painel de custo: quanto o LLM gastou hoje e no mês, por rota e por engine, com a projeção até o
+      fim do mês e o teto diário à vista (preços de `anthropic-price-list.ts`, contadores em memória)
+- [ ] Laboratório de cache HTTP: `ETag`/`If-None-Match` e `Cache-Control` numa rota de verdade, com o
+      304 acontecendo ao vivo e os bytes economizados
+- [ ] Laboratório de compressão: a mesma resposta em `gzip`, `br` e `identity`, com tamanho e tempo
+      reais medidos no servidor
+- [ ] `du` do índice: documentos, chunks, termos e memória do BM25, com o custo de uma busca medido
+- [ ] Linha do tempo do pod: reinícios, OOMKills e eventos do cluster (só leitura), ao lado dos deploys
+- [ ] Eval A/B de prompt: duas versões do system prompt medidas em recall, latência e custo, com o
+      resultado no CI e fakes nos testes
 
 ## Qualidade (contínuo)
 
 - [ ] Cobertura de testes por camada, com relatório no CI
 - [ ] Dependabot para npm e GitHub Actions
+- [ ] e2e: o teste do `ratelimit` divide o balde do visitante com os dois projetos do Playwright
+      (desktop e phone rodam em paralelo do mesmo endereço) e falha sozinho às vezes. Dar a ele um
+      balde próprio ou rodar os dois projetos em série
