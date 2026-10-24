@@ -569,3 +569,19 @@ export function latencyStrip(samples, width = 48) {
     })
     .join("");
 }
+
+/**
+ * `man <cmd>` as text sections: [[heading, lines]]. Examples and "veja também" stay out of here,
+ * because the terminal draws those as buttons that run the command.
+ */
+export function manualSections({ synopsis, description, options }) {
+  const sections = [
+    ["sinopse", synopsis],
+    ["descrição", [description]],
+  ];
+  if (options?.length) {
+    const width = Math.min(28, Math.max(...options.map((o) => o.flag.length)) + 2);
+    sections.push(["opções", options.map((o) => `${o.flag.padEnd(width)}${o.text}`)]);
+  }
+  return sections;
+}

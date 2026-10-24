@@ -335,3 +335,35 @@ test("ratelimit empties the lab bucket on the server and reads it back from the 
   await expect(out.locator(".t-line", { hasText: /aceitos/ })).toHaveCount(2);
   expect(errors).toEqual([]);
 });
+
+test("man lists its pages and says which commands this server cannot run", async ({ page }) => {
+  // Its own setup: `man rm` is supposed to 404, so only errors outside the manual fail this one.
+  const errors: string[] = [];
+  page.on("pageerror", (err) => errors.push(err.message));
+  page.on("response", (res) => {
+    const { pathname } = new URL(res.url());
+    if (res.status() >= 400 && !(res.status() === 404 && pathname.startsWith("/api/man/")))
+      errors.push(`${res.status()} ${pathname}`);
+  });
+  page.on("console", (msg) => {
+    if (msg.type() === "error" && !msg.text().includes("404")) errors.push(msg.text());
+  });
+  await page.goto("/");
+  const out = page.locator("#term-out");
+
+  await run(page, "man");
+  await expect(out).toContainText("as páginas deste manual");
+  // No STUN sockets and no cluster in this run, so their pages say so instead of inviting a click.
+  await expect(out.locator(".t-line", { hasText: "como o seu NAT te mapeia" })).toContainText("desligado aqui");
+
+  await out.getByRole("button", { name: "manual de ask" }).click();
+  await expect(out).toContainText("SINOPSE");
+  await expect(out).toContainText("--xray");
+  await expect(out).toContainText("VEJA TAMBÉM");
+  // No LLM key here either: the ask page is honest about what it can do on this server.
+  await expect(out).toContainText("desligado neste servidor");
+
+  await run(page, "man rm");
+  await expect(out).toContainText('não há página de manual para "rm"');
+  expect(errors).toEqual([]);
+});

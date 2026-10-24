@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { AskQuestion } from "./application/ask-question.js";
 import { BrowsePortfolio } from "./application/browse-portfolio.js";
 import { BrowseTlsSamples } from "./application/browse-tls-samples.js";
+import { DescribeCommands } from "./application/describe-commands.js";
 import { InspectCluster } from "./application/inspect-cluster.js";
 import { InspectVisitor } from "./application/inspect-visitor.js";
 import { LoadLab } from "./application/load-lab.js";
@@ -37,6 +38,8 @@ import { LeakZone } from "./infrastructure/dns/leak-zone.js";
 import { loadEvalSet } from "./infrastructure/evals/json-eval-set.js";
 import { LoopbackTarget } from "./infrastructure/load/loopback-target.js";
 import { JsonLogger } from "./infrastructure/logging/json-logger.js";
+import { StaticManualLibrary } from "./infrastructure/manual/static-manual-library.js";
+import { WiredCapabilities } from "./infrastructure/manual/wired-capabilities.js";
 import { InMemoryCrowd } from "./infrastructure/anonymity/in-memory-crowd.js";
 import { AnthropicPriceList } from "./infrastructure/llm/anthropic-price-list.js";
 import { ClaudeAnswerer } from "./infrastructure/llm/claude-answerer.js";
@@ -201,6 +204,24 @@ const tap = certFile && keyFile ? new TlsTap({ proxyProtocol: process.env.TLS_PR
 // What each h2 connection opened with, filled by the TLS front below and read by the scan.
 const http2Connections = tap ? new TrackedHttp2Connections() : null;
 
+// `man <cmd>` reads this: the pages ship with the image, but what is actually wired here decides
+// whether a page invites the visitor to run the command or explains why it cannot answer.
+const describeCommands = new DescribeCommands(
+  new StaticManualLibrary(),
+  new WiredCapabilities({
+    llm: answerer !== null,
+    docsage: docsage !== null,
+    cluster: clusterReader !== null,
+    deploys: buildHistory !== null || rolloutHistory !== null,
+    traces: true,
+    searchLab: true,
+    loadLab: true,
+    dnsLeak: leakProbes !== null,
+    stun: natBindings !== null,
+    tls: tap !== null,
+  }),
+);
+
 const app = createApp({
   browse: new BrowsePortfolio(content),
   askQuestion: new AskQuestion(retriever, answerer, {
@@ -238,6 +259,7 @@ const app = createApp({
     ].map(([name, path]) => new LoopbackTarget(name, path, `http://127.0.0.1:${port}`)),
   ),
   testDnsLeak: leakProbes ? new TestDnsLeak(leakProbes, new DnsReverseLookup()) : null,
+  describeCommands,
   probeNat: natBindings
     ? new ProbeNat(
         natBindings,

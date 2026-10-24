@@ -115,9 +115,9 @@ um terminal interativo e métricas ao vivo, rodando no k3s.
 
 ## 0.5 Polimento
 
-- [ ] Terminal: autocomplete com Tab e `man <cmd>`
+- [x] Terminal: autocomplete com Tab e `man <cmd>`
   - [x] Autocomplete com Tab (comandos e slugs) e sugestão "você quis dizer"
-  - [ ] `man <cmd>`
+  - [x] `man <cmd>`, servido de `/api/man` e dizendo quando o comando está desligado neste servidor
 - [ ] Terminal: pipes simples (`| grep`, `| jq .campo`) e histórico salvo
 - [x] Alternância de tema claro/escuro
 - [ ] Versão em inglês (conteúdo bilíngue, `?lang=en`)

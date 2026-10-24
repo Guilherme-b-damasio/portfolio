@@ -17,6 +17,7 @@ import {
   kubeAge,
   latencyStrip,
   guessCommand,
+  manualSections,
   highlightParts,
   nodeRows,
   PAGES,
@@ -37,6 +38,7 @@ import {
 
 const COMMANDS = [
   "help",
+  "man",
   "whoami",
   "ls",
   "cat",
@@ -155,9 +157,58 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ["stun", "como o seu NAT te mapeia, medido por dois sockets UDP deste servidor"],
         ["curl <caminho>", "chama a API crua, ex: curl /api/profile"],
         ["open <página>", OPENABLE.join(" · ")],
+        ["man <comando>", "o manual do comando, com o que ele faz e o que ele chama"],
         ["clear", "limpa a tela"],
       ];
       print(...rows.map(([c, d]) => line([acc(c.padEnd(24)), dim(d)])));
+    },
+
+    async man(args) {
+      const wanted = (args[0] ?? "").toLowerCase();
+      const { res, body } = await api(wanted ? `/api/man/${encodeURIComponent(wanted)}` : "/api/man");
+      if (res.status === 404 && wanted) {
+        say(warn("! "), `man: não há página de manual para "${wanted.slice(0, 40)}"`);
+        const guess = guessCommand(wanted, COMMANDS);
+        if (guess) say(dim("você quis dizer "), runButton(`man ${guess}`, `man ${guess}`), dim("?"));
+        return say(dim("rode "), runButton("man", "man"), dim(" para ver as páginas que existem"));
+      }
+      if (res.status === 404) return say(dim("o manual está desligado neste servidor"));
+      if (!res.ok) return failed(res.status);
+
+      if (!wanted) {
+        say(dim("as páginas deste manual, lidas de /api/man neste servidor:"));
+        for (const c of body.commands) {
+          print(
+            line([
+              runButton(c.name.padEnd(12), `man ${c.name}`, `manual de ${c.name}`),
+              c.available ? c.summary : dim(c.summary),
+              c.available ? "" : warn("  · desligado aqui"),
+            ]),
+          );
+        }
+        return say(dim("man <comando> abre uma página · help lista os comandos numa linha cada"));
+      }
+
+      say(bold(body.name.toUpperCase()), dim(`  ${body.summary}`));
+      if (body.off) say(warn("! desligado neste servidor  "), dim(body.off));
+      for (const [heading, lines] of manualSections(body)) {
+        print(line([acc(heading.toUpperCase())], "t-gap"));
+        for (const text of lines) print(line([dim("  "), text]));
+      }
+      if (body.examples?.length) {
+        print(line([acc("EXEMPLOS")], "t-gap"));
+        for (const example of body.examples) print(line([dim("  "), runButton(example, example)]));
+      }
+      if (body.seeAlso?.length) {
+        print(
+          line(
+            [acc("VEJA TAMBÉM"), dim("  ")].concat(
+              body.seeAlso.flatMap((name) => [runButton(name, `man ${name}`, `manual de ${name}`), " "]),
+            ),
+            "t-gap",
+          ),
+        );
+      }
     },
 
     async whoami() {
@@ -956,13 +1007,15 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
               ? ["projects"]
               : words[0] === "kubectl"
                 ? (KUBECTL_WORDS[words.length - 2] ?? [])
-                : words[0] === "open"
-                  ? OPENABLE
-                  : words[0] === "ask" && words.length === 2
-                    ? ["--xray", "--new", "--engine"]
-                    : words[0] === "ask" && words[words.length - 2] === "--engine"
-                      ? ["docsage", "local"]
-                      : [];
+                : words[0] === "man"
+                  ? COMMANDS
+                  : words[0] === "open"
+                    ? OPENABLE
+                    : words[0] === "ask" && words.length === 2
+                      ? ["--xray", "--new", "--engine"]
+                      : words[0] === "ask" && words[words.length - 2] === "--engine"
+                        ? ["docsage", "local"]
+                        : [];
       const matches = pool.filter((c) => c.startsWith(words[words.length - 1]));
       if (!matches.length) return;
       if (matches.length === 1) {

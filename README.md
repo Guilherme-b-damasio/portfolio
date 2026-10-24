@@ -142,6 +142,8 @@ Portuguese stemmer (`src/infrastructure/search/portuguese-stemmer.ts`), so "trab
 | `GET /api/deploys`       | The last pushes to `develop`, each from commit to image build (GitHub Actions) to the tag Flux picked (`selectedAt`) to rollout (the ReplicaSet Flux's change created) to pod Ready. Always 200: `sources.github`, `sources.cluster` and `sources.flux` say on their own whether they answered (`ok`, `off` or `unavailable` with a safe `error`) |
 | `GET /api/status/history` | In-process samples every 5 min for the last 24h (reset on restart) |
 | `GET /api/traces/:id`     | One finished `/api` or `/mcp` request, step by step: route, status, total time and its spans (`retrieve`, `generate`) with offsets, durations and attributes. The id comes in each response's `x-trace-id`; the last 500 are kept in memory, 32 spans each. `trace [id]` in the terminal draws the waterfall |
+| `GET /api/man`            | The terminal's manual: a page per command, each marked `available` against what this server actually wired, so a command that cannot answer here says so |
+| `GET /api/man/:command`   | One page: synopsis, description, options, runnable examples and `off` with the reason the command is off on this deployment. `man <comando>` in the terminal |
 | `GET /metrics`            | Prometheus text format, including `portfolio_llm_tokens_used_today` |
 | `GET /healthz`            | Probes                                      |
 

@@ -17,6 +17,7 @@ import {
   formatUptime,
   formatUsd,
   guessCommand,
+  manualSections,
   formatAttrs,
   highlightParts,
   hourStrip,
@@ -542,5 +543,34 @@ describe("DNS leak helpers", () => {
     expect(leakProbeUrl("0123456789abcdef.leak.example.test", 42)).toBe(
       "https://0123456789abcdef.leak.example.test/p.gif?42",
     );
+  });
+});
+
+describe("manual", () => {
+  const page = {
+    name: "ask",
+    summary: "pergunta ao RAG",
+    synopsis: ['ask "<pergunta>"', "ask [--xray]"],
+    description: "Manda a pergunta para POST /api/ask.",
+    options: [
+      { flag: "--xray", text: "mostra cada etapa" },
+      { flag: "--engine docsage|local", text: "troca o recuperador" },
+    ],
+    examples: ['ask "oi"'],
+    seeAlso: ["search"],
+  };
+
+  it("lays the page out as sections, with the flags in one column", () => {
+    expect(manualSections(page)).toEqual([
+      ["sinopse", ['ask "<pergunta>"', "ask [--xray]"]],
+      ["descrição", ["Manda a pergunta para POST /api/ask."]],
+      ["opções", ["--xray                  mostra cada etapa", "--engine docsage|local  troca o recuperador"]],
+    ]);
+  });
+
+  it("leaves out the options of a command that has none", () => {
+    const plain = { ...page, options: undefined };
+    expect(manualSections(plain).map(([heading]) => heading)).toEqual(["sinopse", "descrição"]);
+    expect(manualSections({ ...plain, options: [] }).map(([heading]) => heading)).toEqual(["sinopse", "descrição"]);
   });
 });
