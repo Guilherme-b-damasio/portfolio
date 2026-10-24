@@ -153,6 +153,22 @@ Try the stream with curl:
 curl -N -H 'content-type: application/json' -H 'accept: text/event-stream'   -d '{"question":"o que é o docsage?"}' http://localhost:3000/api/ask
 ```
 
+## Terminal
+
+Plain HTML, CSS and ES modules in `public/`, no framework and no build step. Beyond the commands,
+three things make it feel like a shell:
+
+- **`man <comando>`** reads `GET /api/man` on this server, so every page says whether the command
+  can answer *here*: `man stun` explains the UDP ports are closed when they are, and the examples in
+  a page are buttons that run themselves. Tab completes command names, including `grep` and `jq`.
+- **Pipes**: `<comando> | grep [-i] [-v] <padrão>` and `<comando> | jq <filtro>`. The command runs
+  once, exactly as it would alone, and its printed lines are captured into a fragment instead of the
+  screen; the filters are text in, text out. `jq` takes the slice of the language a field needs
+  (`.`, `.campo`, `.a.b`, `.[2]`, `.[]`) over the JSON the command printed, and prints strings bare
+  like `jq -r`. Try `curl /api/projects | jq .[].slug` or `status | grep mem`.
+- **History**: the last 50 commands are kept in this browser's `localStorage` and come back with ↑
+  after a reload. Storage that refuses (private window, blocked cookies) just starts empty.
+
 ## Rate limits
 
 Every limited route (`/api/ask`, `/mcp`, `/api/scan`, `/api/contact` and the labs) is an in-memory

@@ -585,3 +585,129 @@ export function manualSections({ synopsis, description, options }) {
   }
   return sections;
 }
+
+// ---------- pipelines: `<comando> | grep <padrão> | jq .campo` ----------
+
+/** Splits a command line on the pipes outside quotes. */
+export function splitPipes(line) {
+  const parts = [];
+  let current = "";
+  let quote = null;
+  for (const ch of line) {
+    if (quote) {
+      if (ch === quote) quote = null;
+      current += ch;
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+      current += ch;
+    } else if (ch === "|") {
+      parts.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  parts.push(current);
+  return parts.map((p) => p.trim());
+}
+
+/** A command line as its stages: [["curl", "/api/profile"], ["jq", ".name"]]. */
+export function parsePipeline(line) {
+  return splitPipes(line).map(parseLine);
+}
+
+/**
+ * `grep [-i] [-v] <padrão>` over the lines a command printed. The pattern is a regular expression
+ * when it compiles and a plain substring when it does not, so a stray `(` filters instead of throwing.
+ */
+export function grepLines(lines, args) {
+  const { on: insensitive, rest: withoutI } = takeFlag(args, "-i");
+  const { on: invert, rest } = takeFlag(withoutI, "-v");
+  const pattern = rest.join(" ");
+  if (!pattern) return { error: "uso: <comando> | grep [-i] [-v] <padrão>" };
+  let matches;
+  try {
+    const expression = new RegExp(pattern, insensitive ? "i" : "");
+    matches = (l) => expression.test(l);
+  } catch {
+    const needle = insensitive ? pattern.toLowerCase() : pattern;
+    matches = (l) => (insensitive ? l.toLowerCase() : l).includes(needle);
+  }
+  return { lines: lines.filter((l) => matches(l) !== invert) };
+}
+
+/** The JSON inside what a command printed: from the first line that opens an object or an array. */
+export function jsonFrom(lines) {
+  const start = lines.findIndex((l) => /^\s*[[{]/.test(l));
+  if (start === -1) return { error: "jq: a saída deste comando não é JSON" };
+  try {
+    return { value: JSON.parse(lines.slice(start).join("\n")) };
+  } catch {
+    return { error: "jq: não consegui ler essa saída como JSON" };
+  }
+}
+
+/** A jq filter as steps: `.`, `.campo`, `.a.b`, `.[2]`, `.[].campo`. */
+export function jqSteps(filter) {
+  if (!filter.startsWith(".")) return { error: `jq: um filtro começa com '.', não '${filter.slice(0, 20)}'` };
+  const steps = [];
+  let rest = filter.slice(1);
+  while (rest.length) {
+    const field = rest.match(/^[A-Za-z_][\w-]*/);
+    const index = rest.match(/^\[(\d*)\]/);
+    if (field) steps.push({ field: field[0] });
+    else if (index) steps.push(index[1] === "" ? { each: true } : { index: Number(index[1]) });
+    else return { error: `jq: não entendi '${rest.slice(0, 20)}' no filtro` };
+    rest = rest.slice((field ?? index)[0].length);
+    if (rest.startsWith(".")) rest = rest.slice(1);
+  }
+  return { steps };
+}
+
+/** Walks a parsed JSON value through jq steps. `[]` fans out, so the result is always a list. */
+export function jqValues(value, steps) {
+  let current = [value];
+  for (const step of steps) {
+    const next = [];
+    for (const item of current) {
+      if (step.each) {
+        if (!Array.isArray(item)) return { error: "jq: [] só funciona num array" };
+        next.push(...item);
+      } else if (step.index != null) {
+        if (!Array.isArray(item)) return { error: `jq: [${step.index}] só funciona num array` };
+        next.push(item[step.index] ?? null);
+      } else {
+        if (item == null || typeof item !== "object" || Array.isArray(item))
+          return { error: `jq: '${step.field}' não existe nesse ponto` };
+        next.push(item[step.field] ?? null);
+      }
+    }
+    current = next;
+  }
+  return { values: current };
+}
+
+/** `jq <filtro>` end to end: the lines a command printed in, the lines jq prints out. */
+export function jqLines(lines, args) {
+  const filter = args.join("") || ".";
+  const parsed = jsonFrom(lines);
+  if (parsed.error) return parsed;
+  const steps = jqSteps(filter);
+  if (steps.error) return steps;
+  const walked = jqValues(parsed.value, steps.steps);
+  if (walked.error) return walked;
+  // Strings come out bare, like `jq -r`: the point here is reading a field, not quoting it back.
+  const show = (v) => (typeof v === "string" ? v : JSON.stringify(v, null, 2));
+  return { lines: walked.values.flatMap((v) => show(v).split("\n")) };
+}
+
+/** The saved command history: whatever survives in storage, as strings, newest last and capped. */
+export function savedHistory(raw, max = 50) {
+  try {
+    const parsed = JSON.parse(raw ?? "[]");
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((c) => typeof c === "string" && c.trim()).slice(-max);
+  } catch {
+    return [];
+  }
+}

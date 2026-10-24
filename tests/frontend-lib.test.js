@@ -18,6 +18,12 @@ import {
   formatUsd,
   guessCommand,
   manualSections,
+  grepLines,
+  jqLines,
+  jqSteps,
+  parsePipeline,
+  savedHistory,
+  splitPipes,
   formatAttrs,
   highlightParts,
   hourStrip,
@@ -572,5 +578,53 @@ describe("manual", () => {
     const plain = { ...page, options: undefined };
     expect(manualSections(plain).map(([heading]) => heading)).toEqual(["sinopse", "descrição"]);
     expect(manualSections({ ...plain, options: [] }).map(([heading]) => heading)).toEqual(["sinopse", "descrição"]);
+  });
+});
+
+describe("pipelines", () => {
+  it("splits on the pipes outside quotes", () => {
+    expect(parsePipeline("curl /api/projects | jq .[].slug")).toEqual([
+      ["curl", "/api/projects"],
+      ["jq", ".[].slug"],
+    ]);
+    // A pipe inside a question belongs to the question, not to the shell.
+    expect(splitPipes('ask "node | deno?" | grep node')).toEqual(['ask "node | deno?"', "grep node"]);
+    expect(parsePipeline("status")).toEqual([["status"]]);
+  });
+
+  it("greps the captured lines, as a regex or as plain text", () => {
+    const lines = ["uptime      3h", "memória     64 MB rss", "req/min     12"];
+    expect(grepLines(lines, ["mem"]).lines).toEqual(["memória     64 MB rss"]);
+    expect(grepLines(lines, ["^req"]).lines).toEqual(["req/min     12"]);
+    expect(grepLines(lines, ["-i", "MEM"]).lines).toEqual(["memória     64 MB rss"]);
+    expect(grepLines(lines, ["-v", "mem"]).lines).toEqual(["uptime      3h", "req/min     12"]);
+    // An unfinished regex is read as text instead of throwing.
+    expect(grepLines(["a(b", "c"], ["a(b"]).lines).toEqual(["a(b"]);
+    expect(grepLines(lines, []).error).toMatch(/uso/);
+  });
+
+  it("reads a field out of the JSON a command printed", () => {
+    const lines = ["HTTP 200 · 4 ms · application/json", "{", '  "name": "Guilherme",', '  "role": "backend"', "}"];
+    expect(jqLines(lines, [".name"]).lines).toEqual(["Guilherme"]);
+    expect(jqLines(lines, ["."]).lines[0]).toBe("{");
+    expect(jqLines(["não é json"], [".name"]).error).toMatch(/não é JSON/);
+  });
+
+  it("walks arrays with [] and [n], and says where a filter does not fit", () => {
+    const lines = ['[{ "slug": "docsage", "stack": ["node"] }, { "slug": "portfolio" }]'];
+    expect(jqLines(lines, [".[].slug"]).lines).toEqual(["docsage", "portfolio"]);
+    expect(jqLines(lines, [".[0].stack[0]"]).lines).toEqual(["node"]);
+    expect(jqLines(lines, [".[1].stack"]).lines).toEqual(["null"]);
+    expect(jqLines(lines, [".slug"]).error).toMatch(/'slug' não existe/);
+    expect(jqSteps("slug").error).toMatch(/começa com '\.'/);
+    expect(jqSteps(".a.b")).toEqual({ steps: [{ field: "a" }, { field: "b" }] });
+  });
+
+  it("keeps the saved history usable whatever is in storage", () => {
+    expect(savedHistory('["status", "help"]')).toEqual(["status", "help"]);
+    expect(savedHistory(null)).toEqual([]);
+    expect(savedHistory("{")).toEqual([]);
+    expect(savedHistory('["ok", 7, "", null]')).toEqual(["ok"]);
+    expect(savedHistory(JSON.stringify(Array.from({ length: 80 }, (_, i) => `c${i}`)), 50)).toHaveLength(50);
   });
 });
