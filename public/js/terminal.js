@@ -16,12 +16,15 @@ import {
   formatUsd,
   kubeAge,
   latencyStrip,
+  grepLines,
   guessCommand,
+  jqLines,
   manualSections,
+  parsePipeline,
+  savedHistory,
   highlightParts,
   nodeRows,
   PAGES,
-  parseLine,
   podRows,
   rememberTurn,
   resolverParts,
@@ -57,11 +60,32 @@ const COMMANDS = [
   "open",
   "clear",
 ];
+const HISTORY_KEY = "portfolio:history"; // the command history, kept in this browser and nowhere else
+const HISTORY_MAX = 50;
+// What can stand after a pipe, each one lines in and lines out.
+const FILTERS = { grep: grepLines, jq: jqLines };
+const MAN_PAGES = [...COMMANDS, ...Object.keys(FILTERS)]; // the manual also has a page per filter
 const MAX_SHOTS = 10; // per `ratelimit n`; the server's bucket is the real limit
 const KUBECTL_WORDS = [["get"], ["pods", "nodes"], ["-n", "-A"]]; // what Tab offers after `kubectl`, by position
 const OPENABLE = PAGES.filter((p) => p !== "inicio");
 const CHIPS = ["whoami", "ls projects", 'ask "como funciona o docsage?"', "status", "curl /api/projects", "help"];
 const isTodo = (text) => /^TODO\b/.test(text.trim());
+
+// localStorage, when the browser allows it. Blocked or full, the terminal just forgets between visits.
+const read = (key) => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+const write = (key, value) => {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* the history just won't survive a reload */
+  }
+};
 
 // ---------- segments: the pieces a terminal line is made of ----------
 const text = (t, cls) => el("span", { class: cls }, t);
@@ -71,8 +95,9 @@ const warn = (t) => text(t, "t-warn");
 const bold = (t) => text(t, "t-bold");
 
 export function createTerminal({ out, form, input, hint, chips, bucket, projects, navigate }) {
-  const history = [];
-  let historyIndex = 0;
+  // The history survives a reload; a browser that refuses storage just starts empty every time.
+  const history = savedHistory(read(HISTORY_KEY));
+  let historyIndex = history.length;
   let quota = null; // { remaining, limit, refillPerMinute, at }
   let busy = false;
   let conversation = []; // last turns with a generated answer, sent with the next ask as a follow-up
@@ -82,7 +107,14 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
   function line(segments, cls) {
     return el("div", { class: cls ? `t-line ${cls}` : "t-line" }, segments);
   }
+  // While a pipeline runs, output goes into a fragment instead of the screen, so the filters can
+  // read it. It stays a real parent, so a command that replaces its own loading line still works.
+  let sink = null;
   function print(...lines) {
+    if (sink) {
+      sink.append(...lines);
+      return;
+    }
     out.append(...lines);
     out.scrollTop = out.scrollHeight;
   }
@@ -156,6 +188,8 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
         ["dnsleak", "qual resolvedor DNS você usa de verdade (VPN vazando?)"],
         ["stun", "como o seu NAT te mapeia, medido por dois sockets UDP deste servidor"],
         ["curl <caminho>", "chama a API crua, ex: curl /api/profile"],
+        ["<comando> | grep <padrão>", "filtra as linhas que o comando imprimiu (-i, -v)"],
+        ["<comando> | jq .campo", "lê um campo do JSON que o comando imprimiu"],
         ["open <página>", OPENABLE.join(" · ")],
         ["man <comando>", "o manual do comando, com o que ele faz e o que ele chama"],
         ["clear", "limpa a tela"],
@@ -168,7 +202,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
       const { res, body } = await api(wanted ? `/api/man/${encodeURIComponent(wanted)}` : "/api/man");
       if (res.status === 404 && wanted) {
         say(warn("! "), `man: não há página de manual para "${wanted.slice(0, 40)}"`);
-        const guess = guessCommand(wanted, COMMANDS);
+        const guess = guessCommand(wanted, MAN_PAGES);
         if (guess) say(dim("você quis dizer "), runButton(`man ${guess}`, `man ${guess}`), dim("?"));
         return say(dim("rode "), runButton("man", "man"), dim(" para ver as páginas que existem"));
       }
@@ -930,28 +964,69 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
     const trimmed = (raw ?? "").trim();
     if (!trimmed || busy) return;
     history.push(trimmed);
+    if (history.length > HISTORY_MAX) history.splice(0, history.length - HISTORY_MAX);
     historyIndex = history.length;
+    write(HISTORY_KEY, JSON.stringify(history));
     const echo = line([acc("$ "), trimmed]);
     print(echo);
 
-    const [name, ...args] = parseLine(trimmed);
+    const [[name, ...args], ...filters] = parsePipeline(trimmed);
     const command = commands[name.toLowerCase()];
     if (!command) {
+      if (FILTERS[name.toLowerCase()])
+        return say(
+          warn("! "),
+          `${name} só funciona depois de um |, como `,
+          runButton("status | grep mem", "status | grep mem"),
+        );
       const guess = guessCommand(name.toLowerCase(), COMMANDS);
       say(warn("! "), `${name}: comando não encontrado. Digite 'help'.`);
       if (guess) say(dim("você quis dizer "), runButton(guess, guess), dim("?"));
       return;
     }
+    const unknown = filters.find(([filter]) => !FILTERS[(filter ?? "").toLowerCase()]);
+    if (unknown) return say(warn("! "), `depois de um | só vêm grep e jq, não ${(unknown[0] || "nada").slice(0, 20)}`);
+
     busy = true;
     const stop = recordTraces();
+    const captured = filters.length ? new DocumentFragment() : null;
+    sink = captured;
     try {
       await command(args);
     } catch {
       failed(0);
     } finally {
+      sink = null;
       busy = false;
+      if (captured) pipe(captured, filters);
       linkTraces(echo, trimmed, stop());
     }
+  }
+
+  /** Runs what the command printed through the filters, then prints what comes out. */
+  function pipe(captured, filters) {
+    let lines = capturedLines(captured);
+    const before = lines.length;
+    for (const [filter, ...args] of filters) {
+      const result = FILTERS[filter.toLowerCase()](lines, args);
+      if (result.error) return say(warn("! "), result.error);
+      lines = result.lines;
+    }
+    if (!lines.length) return say(dim(`(nada: ${before} linha${before === 1 ? "" : "s"} entraram no |)`));
+    print(...lines.map((l) => line([l])));
+    say(dim(`${lines.length} de ${before} linha${before === 1 ? "" : "s"}`));
+  }
+
+  /** What a command printed, as text lines: the .t-line rows inside it, or the element's own text. */
+  function capturedLines(captured) {
+    const lines = [];
+    for (const node of captured.children) {
+      const rows = node.classList.contains("t-line") ? [node] : [...node.querySelectorAll(".t-line")];
+      for (const row of rows.length ? rows : [node]) {
+        lines.push(...(row.textContent ?? "").split("\n"));
+      }
+    }
+    return lines;
   }
 
   // Once a command finished, its echo line opens the trace of the request it made (the last one,
@@ -1008,7 +1083,7 @@ export function createTerminal({ out, form, input, hint, chips, bucket, projects
               : words[0] === "kubectl"
                 ? (KUBECTL_WORDS[words.length - 2] ?? [])
                 : words[0] === "man"
-                  ? COMMANDS
+                  ? MAN_PAGES
                   : words[0] === "open"
                     ? OPENABLE
                     : words[0] === "ask" && words.length === 2

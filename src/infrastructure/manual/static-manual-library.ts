@@ -16,8 +16,8 @@ const PAGES: ManualPage[] = [
     synopsis: ["man", "man <comando>"],
     description:
       "Sem argumento, lista as páginas do manual. Com um comando, mostra a página dele: para que serve, as opções e exemplos que você pode rodar clicando. As páginas vêm de GET /api/man neste servidor, então uma página avisa quando o comando está desligado aqui — por falta de uma chave, de uma porta UDP ou de acesso ao cluster.",
-    examples: ["man ask", "man kubectl", "curl /api/man"],
-    seeAlso: ["help", "curl"],
+    examples: ["man ask", "man grep", "curl /api/man"],
+    seeAlso: ["help", "curl", "grep", "jq"],
   },
   {
     name: "whoami",
@@ -176,8 +176,34 @@ const PAGES: ManualPage[] = [
     synopsis: ["curl <caminho>"],
     description:
       "Faz um GET no caminho e mostra status, tempo, content-type e o corpo. É a saída mais honesta do terminal: tudo que os outros comandos desenham sai dessas mesmas rotas.",
-    examples: ["curl /api/profile", "curl /api/status", "curl /api/man"],
-    seeAlso: ["man", "status"],
+    examples: ["curl /api/profile", "curl /api/projects | jq .[].slug"],
+    seeAlso: ["jq", "grep", "man"],
+  },
+  {
+    name: "grep",
+    summary: "filtra as linhas que o comando antes do | imprimiu",
+    synopsis: ["<comando> | grep [-i] [-v] <padrão>"],
+    description:
+      "O terminal tem pipes: a saída do comando da esquerda vira linhas de texto e o grep só deixa passar as que batem com o padrão. O padrão é uma expressão regular quando ela compila e texto puro quando não, então um parêntese solto filtra em vez de explodir. Filtra o que foi impresso, no navegador; o comando da esquerda roda igual, uma vez só.",
+    options: [
+      { flag: "-i", text: "ignora maiúsculas e minúsculas" },
+      { flag: "-v", text: "deixa passar só o que NÃO bate" },
+    ],
+    examples: ["status | grep mem", "kubectl get pods | grep -v Running", "help | grep ask"],
+    seeAlso: ["jq", "curl"],
+  },
+  {
+    name: "jq",
+    summary: "lê um campo do JSON que o comando antes do | imprimiu",
+    synopsis: ["<comando> | jq <filtro>"],
+    description:
+      "Pega o JSON que saiu do comando da esquerda (o corpo que o curl imprimiu, por exemplo) e caminha pelo filtro: . devolve tudo, .campo entra numa chave, .a.b desce dois níveis, .[2] pega um item do array e .[] abre o array inteiro, uma linha por item. Textos saem sem as aspas, como no jq -r. É a fatia do jq que serve para ler um campo, não o jq inteiro.",
+    examples: [
+      "curl /api/status | jq .memory.rssMb",
+      "curl /api/projects | jq .[].slug",
+      "curl /api/man | jq .commands[0]",
+    ],
+    seeAlso: ["grep", "curl"],
   },
   {
     name: "open",

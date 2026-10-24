@@ -367,3 +367,35 @@ test("man lists its pages and says which commands this server cannot run", async
   await expect(out).toContainText('não há página de manual para "rm"');
   expect(errors).toEqual([]);
 });
+
+test("a pipeline filters what a command printed, and jq reads a field of the real JSON", async ({ home }) => {
+  const out = home.locator("#term-out");
+  await run(home, "status | grep memória");
+  await expect(out).toContainText("MB rss");
+  await expect(out).toContainText(/1 de \d+ linhas/);
+  // grep -v drops the line instead, and the summary counts the whole output that went into the pipe.
+  await run(home, "status | grep -v o");
+  await expect(out).toContainText(/\d+ de \d+ linhas/);
+
+  await run(home, "curl /api/projects | jq .[].slug");
+  const slugs = out.locator(".t-line", { hasText: "docsage" });
+  await expect(slugs.first()).toBeVisible();
+
+  await run(home, "curl /api/status | jq .memory.rssMb");
+  await expect(out.locator(".t-line").nth(-2)).toHaveText(/^\d+$/);
+
+  await run(home, "status | jq .campo");
+  await expect(out).toContainText("não é JSON");
+
+  await run(home, "grep mem");
+  await expect(out).toContainText("só funciona depois de um |");
+});
+
+test("the command history survives a reload", async ({ home }) => {
+  await run(home, "whoami");
+  await expect(home.locator("#term-out")).toContainText("##");
+  await home.reload();
+  const input = home.getByRole("textbox", { name: "Comando do terminal" });
+  await input.press("ArrowUp");
+  await expect(input).toHaveValue("whoami");
+});
