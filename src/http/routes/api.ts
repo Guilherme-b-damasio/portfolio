@@ -4,6 +4,7 @@ import type { AskQuestion } from "../../application/ask-question.js";
 import type { AskResult } from "../../domain/answer.js";
 import type { BrowsePortfolio } from "../../application/browse-portfolio.js";
 import type { BrowseTlsSamples } from "../../application/browse-tls-samples.js";
+import type { DescribeCommands } from "../../application/describe-commands.js";
 import type { InspectCluster } from "../../application/inspect-cluster.js";
 import type { InspectVisitor } from "../../application/inspect-visitor.js";
 import type { LoadLab } from "../../application/load-lab.js";
@@ -26,6 +27,7 @@ import { contactRouter } from "./contact.js";
 import { dnsLeakRouter } from "./dns-leak.js";
 import { evalsRouter } from "./evals.js";
 import { labRouter } from "./lab.js";
+import { manRouter } from "./man.js";
 import { loadLabRouter } from "./load-lab.js";
 import { scanRouter } from "./scan.js";
 import { searchLabRouter } from "./search-lab.js";
@@ -51,6 +53,7 @@ export interface ApiDeps {
   loadLab?: LoadLab | null; // the load lab at /api/lab/load; one run at a time across every visitor
   testDnsLeak?: TestDnsLeak | null; // /api/dns-leak; off without a delegated zone
   probeNat?: ProbeNat | null; // /api/stun; off without the STUN sockets listening
+  describeCommands?: DescribeCommands | null; // /api/man, the manual `man <cmd>` reads
 }
 
 // A follow-up carries the last turns from the browser. Capped here so a visitor cannot inflate the prompt.
@@ -102,6 +105,7 @@ export function apiRouter(
     loadLab,
     testDnsLeak,
     probeNat,
+    describeCommands,
   }: ApiDeps,
   logger: Logger,
   { bucket: askBucket, gate: askGate }: AskGuards,
@@ -249,6 +253,7 @@ export function apiRouter(
   if (showEvals) api.use("/evals", evalsRouter(showEvals));
   api.use("/dns-leak", dnsLeakRouter(testDnsLeak ?? null));
   api.use("/stun", stunRouter(probeNat ?? null));
+  if (describeCommands) api.use("/man", manRouter(describeCommands));
   api.use("/scan", scanRouter(inspectVisitor, tapped ?? null, tlsSamples ?? null, http2 ?? null));
 
   return api;
